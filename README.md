@@ -6,7 +6,7 @@ A privacy-focused Android app for recording and transcribing medical appointment
 
 - **Local-Only Processing**: All transcription happens on-device. No cloud services, no APIs.
 - **Speech-to-Text**: Uses whisper.cpp for accurate medical conversation transcription.
-- **Medical Information Extraction**: Automatically extracts medications, diagnoses, instructions, and follow-ups.
+- **Schema-Guided Extraction**: Extracts medications, tests, follow-ups, and safety warnings aligned with Calgary-Cambridge consultation model.
 - **Secure Storage**: All data stored locally on the device.
 - **Native Performance**: C++ native layer for efficient model inference.
 
@@ -32,8 +32,8 @@ app/src/main/
 │   │   └── AppState.kt           # UI state
 │   ├── storage/                  # Local storage
 │   │   └── LocalStorage.kt       # JSON-based persistence
-│   └── extraction/               # Medical info extraction
-│       └── MedicalExtractor.kt   # Pattern-based extraction
+│   └── extraction/               # Schema-guided extraction
+│       └── SchemaGuidedExtractor.kt  # Calgary-Cambridge aligned
 └── cpp/                          # Native C++ layer
     ├── CMakeLists.txt            # CMake build config
     ├── native_bridge/            # JNI bridge
@@ -132,9 +132,9 @@ Copy the model to the device's app data directory:
 ```
 Audio Input → AudioRecorder → FloatArray → WhisperContext → Transcription
                                                               ↓
-                                                       MedicalExtractor
+                                                       SchemaGuidedExtractor
                                                               ↓
-                                                       MedicalInfo
+                                                       MedicalExtraction
                                                               ↓
                                                        LocalStorage
 ```

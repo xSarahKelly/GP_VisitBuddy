@@ -60,65 +60,6 @@ enum class Speaker {
     UNKNOWN
 }
 
-/**
- * Extracted medical information from transcription
- */
-data class MedicalInfo(
-    val diagnoses: List<String> = emptyList(),
-    val medications: List<Medication> = emptyList(),
-    val instructions: List<String> = emptyList(),
-    val followUpDate: String? = null,
-    val vitalSigns: VitalSigns? = null,
-    val symptoms: List<String> = emptyList(),
-    val tests: List<MedicalTest> = emptyList(),
-    val warnings: List<String> = emptyList(),
-    val questions: List<String> = emptyList()
-)
-
-/**
- * Medication information
- */
-data class Medication(
-    val name: String,
-    val dosage: String? = null,
-    val frequency: String? = null,
-    val duration: String? = null,
-    val instructions: String? = null,
-    val isNew: Boolean = true
-)
-
-/**
- * Vital signs recorded during appointment
- */
-data class VitalSigns(
-    val bloodPressure: String? = null,
-    val heartRate: Int? = null,
-    val temperature: Float? = null,
-    val weight: Float? = null,
-    val height: Float? = null,
-    val oxygenSaturation: Int? = null
-)
-
-/**
- * Medical test information
- */
-data class MedicalTest(
-    val name: String,
-    val type: TestType = TestType.OTHER,
-    val scheduledDate: String? = null,
-    val location: String? = null,
-    val preparation: String? = null,
-    val result: String? = null
-)
-
-/**
- * Types of medical tests
- */
-enum class TestType {
-    BLOOD_TEST,
-    IMAGING,
-    PROCEDURE,
-    SCREENING,
-    OTHER
-}
+// Medical extraction models are defined in MedicalSchema.kt
+// Using Calgary-Cambridge aligned schema (no diagnoses - patient safety)
 
