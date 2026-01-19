@@ -50,13 +50,23 @@ class WhisperContext private constructor(private var ptr: Long) {
         
         buildString {
             for (i in 0 until segmentCount) {
+                val text = WhisperLib.getTextSegment(ptr, i).trim()
+                
+                // Skip blank audio segments
+                if (text.isEmpty() || 
+                    text.equals("[BLANK_AUDIO]", ignoreCase = true) ||
+                    text.equals("BLANK_AUDIO", ignoreCase = true) ||
+                    text.equals("[BLANK]", ignoreCase = true)) {
+                    continue
+                }
+                
                 if (includeTimestamps) {
                     val t0 = formatTimestamp(WhisperLib.getTextSegmentT0(ptr, i))
                     val t1 = formatTimestamp(WhisperLib.getTextSegmentT1(ptr, i))
-                    val text = WhisperLib.getTextSegment(ptr, i)
                     append("[$t0 --> $t1]: $text\n")
                 } else {
-                    append(WhisperLib.getTextSegment(ptr, i))
+                    if (isNotEmpty()) append(" ")
+                    append(text)
                 }
             }
         }
@@ -73,13 +83,22 @@ class WhisperContext private constructor(private var ptr: Long) {
             WhisperLib.fullTranscribe(ptr, numThreads, data)
             
             val segmentCount = WhisperLib.getTextSegmentCount(ptr)
-            (0 until segmentCount).map { i ->
-                TranscriptionSegment(
-                    text = WhisperLib.getTextSegment(ptr, i),
-                    startMs = WhisperLib.getTextSegmentT0(ptr, i) * 10,
-                    endMs = WhisperLib.getTextSegmentT1(ptr, i) * 10
-                )
-            }
+            (0 until segmentCount)
+                .map { i ->
+                    TranscriptionSegment(
+                        text = WhisperLib.getTextSegment(ptr, i),
+                        startMs = WhisperLib.getTextSegmentT0(ptr, i) * 10,
+                        endMs = WhisperLib.getTextSegmentT1(ptr, i) * 10
+                    )
+                }
+                .filter { segment ->
+                    // Filter out blank audio segments and empty/whitespace-only segments
+                    val text = segment.text.trim()
+                    text.isNotEmpty() && 
+                    !text.equals("[BLANK_AUDIO]", ignoreCase = true) &&
+                    !text.equals("BLANK_AUDIO", ignoreCase = true) &&
+                    !text.equals("[BLANK]", ignoreCase = true)
+                }
         }
     
     /**
