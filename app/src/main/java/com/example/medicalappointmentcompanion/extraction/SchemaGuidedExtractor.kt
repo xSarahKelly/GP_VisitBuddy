@@ -45,7 +45,8 @@ object SchemaGuidedExtractor {
         "ponstan", "mefenamic acid", "co-dydramol", "nurofen",
         
         // Antibiotics 
-        "amoxicillin", "augmentin", "co-amoxiclav", "flucloxacillin",
+        "amoxicillin", "amoxosilin", "a moxosilin", "a moxicillin", "amoxacillin",
+        "augmentin", "co-amoxiclav", "flucloxacillin",
         "doxycycline", "clarithromycin", "azithromycin", "metronidazole",
         "trimethoprim", "nitrofurantoin", "ciprofloxacin", "penicillin",
         
@@ -241,6 +242,7 @@ object SchemaGuidedExtractor {
     ): List<MedicationInstruction> {
         val medications = mutableListOf<MedicationInstruction>()
         
+        // First pass: Look for medications with triggers in same sentence
         for (sentence in sentences) {
             val lowerSentence = sentence.lowercase()
             
@@ -248,10 +250,8 @@ object SchemaGuidedExtractor {
             val hasTrigger = MEDICATION_TRIGGERS.any { lowerSentence.contains(it) }
             if (!hasTrigger) continue
             
-            // Find medication name
-            val medicationName = COMMON_MEDICATIONS.firstOrNull { 
-                lowerSentence.contains(it) 
-            }?.replaceFirstChar { it.uppercase() }
+            // Find medication name - handle transcription errors (spaces, misspellings)
+            val medicationName = findMedicationName(lowerSentence)
             
             if (medicationName != null) {
                 medications.add(
@@ -264,6 +264,46 @@ object SchemaGuidedExtractor {
                         verbatimQuote = sentence.trim()
                     )
                 )
+            }
+        }
+        
+        // Second pass: Look for medications even without explicit triggers
+        // (in case trigger is in previous sentence, e.g., "I'm prescribing..." then "amoxicillin 500mg...")
+        for (i in sentences.indices) {
+            val sentence = sentences[i]
+            val lowerSentence = sentence.lowercase()
+            
+            // Check if this sentence contains a medication name - handle transcription errors
+            val medicationName = findMedicationName(lowerSentence)
+            
+            if (medicationName != null) {
+                // Check if we already extracted this medication
+                val alreadyExtracted = medications.any { 
+                    it.medicineName.equals(medicationName, ignoreCase = true) 
+                }
+                
+                if (!alreadyExtracted) {
+                    // Check if previous sentence had a trigger, or if this sentence has dosage/frequency
+                    val hasDosageOrFrequency = extractDosage(lowerSentence) != null || 
+                                              extractFrequency(lowerSentence) != null
+                    val prevSentenceHasTrigger = i > 0 && MEDICATION_TRIGGERS.any { 
+                        sentences[i - 1].lowercase().contains(it) 
+                    }
+                    
+                    // Extract if there's dosage/frequency (strong indicator) or trigger in previous sentence
+                    if (hasDosageOrFrequency || prevSentenceHasTrigger) {
+                        medications.add(
+                            MedicationInstruction(
+                                medicineName = medicationName,
+                                dosage = extractDosage(lowerSentence),
+                                frequency = extractFrequency(lowerSentence),
+                                duration = extractDuration(lowerSentence),
+                                specialInstructions = extractSpecialInstructions(lowerSentence),
+                                verbatimQuote = sentence.trim()
+                            )
+                        )
+                    }
+                }
             }
         }
         
@@ -487,6 +527,146 @@ object SchemaGuidedExtractor {
             .split("|||")
             .map { it.trim() }
             .filter { it.isNotEmpty() && it.length > 3 }
+    }
+    
+    /**
+     * Find medication name with fuzzy matching to handle transcription errors
+     * Handles common issues like:
+     * - Spaces inserted: "a moxosilin" -> "amoxicillin"
+     * - Misspellings: "moxosilin" -> "amoxicillin"
+     * - Case variations
+     * - Articles: "a amoxicillin" -> "amoxicillin"
+     */
+    private fun findMedicationName(sentence: String): String? {
+        // First try exact match
+        val exactMatch = COMMON_MEDICATIONS.firstOrNull { 
+            sentence.contains(it) 
+        }
+        if (exactMatch != null) {
+            return exactMatch.replaceFirstChar { it.uppercase() }
+        }
+        
+        // Normalize sentence: remove common articles and extra spaces
+        val normalized = sentence
+            .replace(Regex("\\b(a|an|the)\\s+"), "") // Remove articles
+            .replace(" ", "") // Remove all spaces
+            .lowercase()
+        
+        // Check each medication
+        for (medication in COMMON_MEDICATIONS) {
+            val medNormalized = medication.replace(" ", "").lowercase()
+            
+            // Exact match after normalization
+            if (normalized.contains(medNormalized)) {
+                return medication.replaceFirstChar { it.uppercase() }
+            }
+            
+            // Fuzzy match for transcription errors (e.g., "moxosilin" -> "amoxicillin")
+            if (fuzzyMatch(medNormalized, normalized)) {
+                return medication.replaceFirstChar { it.uppercase() }
+            }
+        }
+        
+        return null
+    }
+    
+    /**
+     * Simple fuzzy matching - checks if medication name appears in text
+     * with allowance for transcription errors (missing/extra characters)
+     * Handles cases like "moxosilin" -> "amoxicillin"
+     */
+    private fun fuzzyMatch(medication: String, text: String): Boolean {
+        // If medication is short, require exact match
+        if (medication.length < 6) return false
+        
+        // Check if medication appears as substring
+        if (text.contains(medication)) return true
+        
+        // Check for common transcription errors in medication names
+        // Map common misspellings
+        val commonErrors = mapOf(
+            "moxosilin" to "amoxicillin",
+            "moxocillin" to "amoxicillin",
+            "a moxosilin" to "amoxicillin",
+            "a moxocillin" to "amoxicillin",
+            "moxicillin" to "amoxicillin",
+            "amoxacillin" to "amoxicillin",
+            "amoxocillin" to "amoxicillin"
+        )
+        
+        // Check if text contains a common misspelling that maps to this medication
+        for ((misspelling, correct) in commonErrors) {
+            if (text.contains(misspelling) && medication == correct) {
+                return true
+            }
+        }
+        
+        // Check similarity - if 75%+ of characters match in order, consider it a match
+        val similarity = calculateSimilarity(medication, text)
+        return similarity >= 0.75
+    }
+    
+    /**
+     * Calculate similarity between two strings (simple version)
+     * Returns value between 0.0 and 1.0
+     * Handles cases like "moxosilin" vs "amoxicillin"
+     */
+    private fun calculateSimilarity(str1: String, str2: String): Double {
+        if (str1.isEmpty() || str2.isEmpty()) return 0.0
+        
+        // Find longest common substring
+        val longer = if (str1.length > str2.length) str1 else str2
+        val shorter = if (str1.length > str2.length) str2 else str1
+        
+        // Check if shorter is contained in longer
+        if (longer.contains(shorter)) {
+            return shorter.length.toDouble() / longer.length
+        }
+        
+        // Check for longest common subsequence (characters in order, not necessarily consecutive)
+        // This handles "moxosilin" vs "amoxicillin" better
+        val lcsLength = longestCommonSubsequence(shorter, longer)
+        val similarity = lcsLength.toDouble() / longer.length
+        
+        // Also check if they start/end similarly (strong indicator)
+        val startSimilar = if (shorter.length >= 3 && longer.length >= 3) {
+            shorter.take(3) == longer.take(3)
+        } else false
+        
+        val endSimilar = if (shorter.length >= 3 && longer.length >= 3) {
+            shorter.takeLast(3) == longer.takeLast(3)
+        } else false
+        
+        // Boost similarity if start or end matches
+        val boostedSimilarity = if (startSimilar || endSimilar) {
+            similarity + 0.1
+        } else {
+            similarity
+        }
+        
+        return minOf(boostedSimilarity, 1.0)
+    }
+    
+    /**
+     * Calculate longest common subsequence length
+     * Handles cases where characters match but aren't consecutive
+     */
+    private fun longestCommonSubsequence(str1: String, str2: String): Int {
+        val m = str1.length
+        val n = str2.length
+        val dp = Array(m + 1) { IntArray(n + 1) }
+        
+        for (i in 1..m) {
+            for (j in 1..n) {
+                if (str1[i - 1] == str2[j - 1]) {
+                    dp[i][j] = dp[i - 1][j - 1] + 1
+                } else {
+                    dp[i][j] = maxOf(dp[i - 1][j], dp[i][j - 1])
+                }
+            }
+        }
+        
+        return dp[m][n]
     }
 }
 
