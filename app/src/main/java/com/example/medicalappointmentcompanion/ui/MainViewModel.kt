@@ -41,7 +41,7 @@ private const val LOG_TAG = "MainViewModel"
 class MainViewModel(application: Application) : AndroidViewModel(application) {
     
     private val storage = LocalStorage(application)
-    private val recorder = AudioRecorder()
+    private val recorder = AudioRecorder(application)
     
     private var whisperContext: WhisperContext? = null
     private var recordingTimerJob: Job? = null
@@ -62,21 +62,52 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      */
     private fun autoLoadModel() {
         viewModelScope.launch {
-            val modelLocations = listOf(
-                // App's internal storage (preferred)
-                File(storage.getModelDirectory(), "ggml-tiny.bin"),
-                File(storage.getModelDirectory(), "ggml-base.bin"),
-                File(storage.getModelDirectory(), "ggml-small.bin"),
-                // Common external locations
+            // First, check if model already exists in internal storage
+            val modelDir = storage.getModelDirectory()
+            val modelNames = listOf("ggml-tiny.bin", "ggml-base.bin", "ggml-small.bin")
+            
+            for (modelName in modelNames) {
+                val modelFile = File(modelDir, modelName)
+                if (modelFile.exists() && modelFile.length() > 0) {
+                    Log.d(LOG_TAG, "Found model at: ${modelFile.absolutePath}")
+                    loadModel(modelFile.absolutePath)
+                    return@launch
+                }
+            }
+            
+            // If not found, try to copy from assets
+            try {
+                val assets = getApplication<Application>().assets
+                for (modelName in modelNames) {
+                    try {
+                        assets.open(modelName).use { inputStream ->
+                            val outputFile = File(modelDir, modelName)
+                            outputFile.outputStream().use { outputStream ->
+                                inputStream.copyTo(outputStream)
+                            }
+                            Log.d(LOG_TAG, "Copied model from assets to: ${outputFile.absolutePath}")
+                            loadModel(outputFile.absolutePath)
+                            return@launch
+                        }
+                    } catch (e: Exception) {
+                        // Model not in assets, try next one
+                        Log.d(LOG_TAG, "Model $modelName not found in assets, trying next")
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w(LOG_TAG, "Failed to load model from assets", e)
+            }
+            
+            // Fallback: check external locations
+            val externalLocations = listOf(
                 File("/sdcard/Download/ggml-tiny.bin"),
                 File("/sdcard/Download/ggml-base.bin"),
                 File("/storage/emulated/0/Download/ggml-tiny.bin"),
                 File("/storage/emulated/0/Download/ggml-base.bin"),
-                // Data local tmp (where we pushed it via adb)
                 File("/data/local/tmp/ggml-tiny.bin")
             )
             
-            for (location in modelLocations) {
+            for (location in externalLocations) {
                 if (location.exists() && location.length() > 0) {
                     Log.d(LOG_TAG, "Found model at: ${location.absolutePath}")
                     loadModel(location.absolutePath)
@@ -84,7 +115,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
             
-            Log.d(LOG_TAG, "No model found in common locations")
+            Log.d(LOG_TAG, "No model found in any location")
+            _state.update { 
+                it.copy(
+                    modelError = "No Whisper model found. Please place a model file (ggml-tiny.bin, ggml-base.bin, or ggml-small.bin) in the app's model directory or assets folder."
+                ) 
+            }
         }
     }
     
@@ -264,7 +300,30 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _state.update { it.copy(isRecording = false, isTranscribing = true) }
             
             if (audioData != null && audioData.isNotEmpty()) {
-                transcribeAudio(audioData, duration)
+                // Check if audio is too quiet (likely silent/blank)
+                val maxVal = audioData.maxOrNull() ?: 0f
+                val minVal = audioData.minOrNull() ?: 0f
+                val maxAmplitude = maxOf(kotlin.math.abs(maxVal), kotlin.math.abs(minVal))
+                
+                // Normalize to 16-bit range for comparison (audioData is normalized to [-1, 1])
+                val maxAmplitudeShort = (maxAmplitude * 32767).toInt()
+                
+                Log.d(LOG_TAG, "Audio check: max amplitude = $maxAmplitudeShort (normalized: $maxAmplitude)")
+                
+                if (maxAmplitudeShort < 100) {
+                    // Audio is too quiet - likely no actual recording
+                    _state.update { 
+                        it.copy(
+                            isTranscribing = false,
+                            errorMessage = "Audio too quiet (amplitude: $maxAmplitudeShort). " +
+                                    "Please check microphone permission and speak clearly. " +
+                                    "Expected amplitude: 1000-20000 for normal speech."
+                        ) 
+                    }
+                    Log.w(LOG_TAG, "Rejecting recording: amplitude too low ($maxAmplitudeShort)")
+                } else {
+                    transcribeAudio(audioData, duration)
+                }
             } else {
                 _state.update { 
                     it.copy(
