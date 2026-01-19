@@ -240,7 +240,7 @@ private fun HomeScreen(
         
         // Title - LARGE for accessibility
         Text(
-            text = "Medical Appointment Companion",
+            text = "GP VisitBuddy",
             fontSize = 28.sp,
             fontWeight = FontWeight.Bold,
             color = PrimaryBlue,
@@ -252,7 +252,7 @@ private fun HomeScreen(
         
         // Subtitle - readable size
         Text(
-            text = "Helping Patients Remember What Matters",
+            text = "An Edge-AI solution for patient recall",
             fontSize = 20.sp,
             color = TextSecondary,
             textAlign = TextAlign.Center
@@ -444,7 +444,7 @@ private fun RecordingScreen(
                     .padding(20.dp)
             ) {
                 Text(
-                    text = "Doctor: Take two tablets...",
+                    text = "Doctor: Take two paracetamol...",
                     fontSize = 20.sp,
                     color = TextSecondary.copy(alpha = 0.6f),
                     fontStyle = FontStyle.Italic
@@ -453,7 +453,7 @@ private fun RecordingScreen(
                 Spacer(modifier = Modifier.weight(1f))
                 
                 Text(
-                    text = "AI is listening and transcribing...",
+                    text = "VisitBuddy is listening and transcribing...",
                     fontSize = 18.sp,
                     color = TextHint,
                     textAlign = TextAlign.Center,
@@ -1052,14 +1052,6 @@ private fun ShareDialog(onDismiss: () -> Unit) {
                 }
                 
                 Spacer(modifier = Modifier.height(20.dp))
-                
-                // Accessibility note
-                Text(
-                    text = "Accessibility: Large tap targets, icon + label, clear affordances support motor and cognitive accessibility.",
-                    fontSize = 14.sp,
-                    color = TextHint,
-                    lineHeight = 20.sp
-                )
             }
         },
         confirmButton = {},

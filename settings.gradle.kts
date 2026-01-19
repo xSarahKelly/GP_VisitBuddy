@@ -19,5 +19,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "MedicalAppointmentCompanion"
+rootProject.name = "GP_VisitBuddy"
 include(":app")
