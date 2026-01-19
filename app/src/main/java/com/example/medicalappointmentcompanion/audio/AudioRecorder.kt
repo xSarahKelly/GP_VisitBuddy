@@ -1,7 +1,9 @@
 package com.example.medicalappointmentcompanion.audio
 
 import android.annotation.SuppressLint
+import android.content.Context
 import android.media.AudioFormat
+import android.media.AudioManager
 import android.media.AudioRecord
 import android.media.MediaRecorder
 import android.util.Log
@@ -25,7 +27,7 @@ const val WHISPER_SAMPLE_RATE = 16000
  * Records audio at 16kHz mono PCM, which is the format required by whisper.
  * Can save to WAV file or return raw audio data for direct transcription.
  */
-class AudioRecorder {
+class AudioRecorder(private val context: Context? = null) {
     
     private val scope: CoroutineScope = CoroutineScope(
         Executors.newSingleThreadExecutor().asCoroutineDispatcher()
@@ -54,7 +56,20 @@ class AudioRecorder {
         }
         
         Log.d(LOG_TAG, "Starting recording to: ${outputFile.absolutePath}")
-        recordThread = AudioRecordThread(outputFile, onError)
+        
+        // Configure audio mode for voice recording
+        context?.let {
+            try {
+                val audioManager = it.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+                audioManager?.mode = AudioManager.MODE_IN_COMMUNICATION
+                audioManager?.isSpeakerphoneOn = false
+                Log.d(LOG_TAG, "Audio mode set to MODE_IN_COMMUNICATION")
+            } catch (e: Exception) {
+                Log.w(LOG_TAG, "Failed to configure audio mode", e)
+            }
+        }
+        
+        recordThread = AudioRecordThread(outputFile, context, onError)
         recordThread?.start()
     }
     
@@ -98,6 +113,7 @@ class AudioRecorder {
  */
 private class AudioRecordThread(
     private val outputFile: File,
+    private val context: Context?,
     private val onError: (Exception) -> Unit
 ) : Thread("AudioRecordThread") {
     
@@ -117,21 +133,127 @@ private class AudioRecordThread(
             
             val buffer = ShortArray(bufferSize / 2)
             
-            val audioRecord = AudioRecord(
-                MediaRecorder.AudioSource.MIC,
-                WHISPER_SAMPLE_RATE,
-                AudioFormat.CHANNEL_IN_MONO,
-                AudioFormat.ENCODING_PCM_16BIT,
-                bufferSize
+            // Try multiple audio sources in order of preference
+            val audioSources = listOf(
+                MediaRecorder.AudioSource.VOICE_RECOGNITION,  // Best for speech recognition
+                MediaRecorder.AudioSource.MIC,                // Standard microphone
+                MediaRecorder.AudioSource.VOICE_COMMUNICATION  // Fallback
             )
             
-            if (audioRecord.state != AudioRecord.STATE_INITIALIZED) {
-                throw RuntimeException("AudioRecord failed to initialize")
+            var audioRecord: AudioRecord? = null
+            var selectedSource = -1
+            var bestSource: AudioRecord? = null
+            var bestSourceId = -1
+            var bestAmplitude: Short = 0
+            
+            // Test each audio source by doing a quick recording test
+            for (source in audioSources) {
+                try {
+                    val testRecord = AudioRecord(
+                        source,
+                        WHISPER_SAMPLE_RATE,
+                        AudioFormat.CHANNEL_IN_MONO,
+                        AudioFormat.ENCODING_PCM_16BIT,
+                        bufferSize
+                    )
+                    
+                    if (testRecord.state == AudioRecord.STATE_INITIALIZED) {
+                        // Do a quick test recording to see which source actually captures audio
+                        try {
+                            testRecord.startRecording()
+                            
+                            // Small delay to let microphone initialize
+                            Thread.sleep(50)
+                            
+                            // Read a small sample to test audio levels (0.2 seconds)
+                            val testBuffer = ShortArray(WHISPER_SAMPLE_RATE / 5)
+                            val read = testRecord.read(testBuffer, 0, testBuffer.size)
+                            
+                            if (read > 0) {
+                                var testMax: Short = 0
+                                for (i in 0 until read) {
+                                    val abs = if (testBuffer[i] < 0) (-testBuffer[i]).toShort() else testBuffer[i]
+                                    if (abs > testMax) testMax = abs
+                                }
+                                
+                                Log.d(LOG_TAG, "Audio source $source test: max amplitude = $testMax")
+                                
+                                // Prefer source with highest amplitude
+                                if (testMax > bestAmplitude) {
+                                    bestSource?.stop()
+                                    bestSource?.release()
+                                    bestSource = testRecord
+                                    bestSourceId = source
+                                    bestAmplitude = testMax
+                                } else {
+                                    testRecord.stop()
+                                    testRecord.release()
+                                }
+                            } else {
+                                testRecord.stop()
+                                testRecord.release()
+                            }
+                        } catch (e: Exception) {
+                            Log.w(LOG_TAG, "Failed to test audio source $source", e)
+                            testRecord.release()
+                        }
+                    } else {
+                        testRecord.release()
+                    }
+                } catch (e: Exception) {
+                    Log.w(LOG_TAG, "Audio source $source failed to initialize", e)
+                }
             }
             
+            // Use the source with best audio capture
+            if (bestSource != null && bestAmplitude > 0) {
+                audioRecord = bestSource
+                selectedSource = bestSourceId
+                Log.d(LOG_TAG, "Selected audio source: $selectedSource with test amplitude: $bestAmplitude")
+                
+                if (bestAmplitude < 100) {
+                    Log.w(LOG_TAG, "WARNING: Selected audio source has very low test amplitude ($bestAmplitude). " +
+                            "This may indicate microphone is not capturing audio properly. " +
+                            "Check if another app is using the microphone or if microphone is blocked.")
+                }
+            } else {
+                // Fallback: just use first available source
+                for (source in audioSources) {
+                    try {
+                        val testRecord = AudioRecord(
+                            source,
+                            WHISPER_SAMPLE_RATE,
+                            AudioFormat.CHANNEL_IN_MONO,
+                            AudioFormat.ENCODING_PCM_16BIT,
+                            bufferSize
+                        )
+                        
+                        if (testRecord.state == AudioRecord.STATE_INITIALIZED) {
+                            audioRecord = testRecord
+                            selectedSource = source
+                            Log.w(LOG_TAG, "Using audio source $source (no audio test available)")
+                            break
+                        } else {
+                            testRecord.release()
+                        }
+                    } catch (e: Exception) {
+                        // Continue trying
+                    }
+                }
+            }
+            
+            if (audioRecord == null) {
+                throw RuntimeException("Failed to initialize AudioRecord with any audio source")
+            }
+            
+            val finalAudioRecord = audioRecord
+            
             try {
-                audioRecord.startRecording()
-                Log.d(LOG_TAG, "Recording started at ${WHISPER_SAMPLE_RATE}Hz")
+                finalAudioRecord.startRecording()
+                Log.d(LOG_TAG, "Recording started at ${WHISPER_SAMPLE_RATE}Hz with source $selectedSource")
+                
+                // Small delay to let microphone stabilize
+                Thread.sleep(100)
                 
                 val allData = mutableListOf<Short>()
                 
@@ -139,7 +261,7 @@ private class AudioRecordThread(
                 var totalRead = 0
                 
                 while (!quit.get()) {
-                    val read = audioRecord.read(buffer, 0, buffer.size)
+                    val read = finalAudioRecord.read(buffer, 0, buffer.size)
                     if (read > 0) {
                         totalRead += read
                         for (i in 0 until read) {
@@ -149,7 +271,15 @@ private class AudioRecordThread(
                         }
                         // Log progress every second
                         if (totalRead % WHISPER_SAMPLE_RATE < read) {
-                            Log.d(LOG_TAG, "Recording... ${totalRead / WHISPER_SAMPLE_RATE}s, max amp: $maxAmplitude")
+                            val seconds = totalRead / WHISPER_SAMPLE_RATE
+                            Log.d(LOG_TAG, "Recording... ${seconds}s, max amp: $maxAmplitude")
+                            
+                            // Warn if amplitude is suspiciously low (likely no audio)
+                            if (seconds >= 2 && maxAmplitude < 100) {
+                                Log.w(LOG_TAG, "WARNING: Very low audio amplitude ($maxAmplitude). " +
+                                        "Microphone may not be capturing audio properly. " +
+                                        "Expected: 1000-20000 for normal speech.")
+                            }
                         }
                     } else if (read < 0) {
                         throw RuntimeException("AudioRecord.read returned error: $read")
@@ -158,7 +288,20 @@ private class AudioRecordThread(
                 
                 Log.d(LOG_TAG, "Recording finished. Max amplitude: $maxAmplitude")
                 
-                audioRecord.stop()
+                // Final warning if audio is too quiet
+                if (maxAmplitude < 100) {
+                    Log.e(LOG_TAG, "ERROR: Recording completed but audio amplitude is very low ($maxAmplitude). " +
+                            "This recording will likely result in blank transcription. " +
+                            "Audio source used: $selectedSource. " +
+                            "Check microphone permission and ensure you're speaking clearly.")
+                } else if (maxAmplitude < 1000) {
+                    Log.w(LOG_TAG, "WARNING: Audio amplitude is low ($maxAmplitude). " +
+                            "Transcription quality may be poor. Speak louder or closer to microphone.")
+                } else {
+                    Log.d(LOG_TAG, "Audio amplitude looks good ($maxAmplitude)")
+                }
+                
+                finalAudioRecord.stop()
                 
                 // Save to WAV file
                 val shortArray = allData.toShortArray()
@@ -171,7 +314,17 @@ private class AudioRecordThread(
                         "${allData.size / WHISPER_SAMPLE_RATE.toFloat()}s")
                 
             } finally {
-                audioRecord.release()
+                finalAudioRecord.release()
+                
+                // Reset audio mode
+                context?.let {
+                    try {
+                        val audioManager = it.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+                        audioManager?.mode = AudioManager.MODE_NORMAL
+                    } catch (e: Exception) {
+                        Log.w(LOG_TAG, "Failed to reset audio mode", e)
+                    }
+                }
             }
         } catch (e: Exception) {
             Log.e(LOG_TAG, "Recording error", e)
