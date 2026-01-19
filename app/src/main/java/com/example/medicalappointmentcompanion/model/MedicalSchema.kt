@@ -112,9 +112,9 @@ data class FollowUpInstruction(
 )
 
 /**
- * Safety Advice / Red Flags - ACADEMICALLY STRONG
+ * Safety Advice / Red Flags
  * 
- * Often missed by AI scribes - strong academic justification
+ * Often missed by AI scribes
  * 
  * Examples:
  * - "If you develop a fever"
