@@ -9,3 +9,6 @@
 .externalNativeBuild
 .cxx
 local.properties
+
+# Whisper model files (large binaries - download separately)
+app/src/main/assets/*.bin
