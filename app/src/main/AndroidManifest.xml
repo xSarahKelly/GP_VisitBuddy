@@ -5,6 +5,9 @@
     <!-- Audio recording permission -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     
+    <!-- Internet permission for automatic model download -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    
     <!-- For reading model files from external storage (if user places them there) -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
         android:maxSdkVersion="32" />

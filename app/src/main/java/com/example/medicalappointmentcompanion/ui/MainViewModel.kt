@@ -24,7 +24,10 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import okhttp3.OkHttpClient
+import okhttp3.Request
 import java.io.File
+import java.io.FileOutputStream
 import java.util.UUID
 
 private const val LOG_TAG = "MainViewModel"
@@ -115,11 +118,110 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
             
-            Log.d(LOG_TAG, "No model found in any location")
+            Log.d(LOG_TAG, "No model found in any location, attempting automatic download")
+            // Automatically download the model
+            downloadModel("ggml-tiny.bin")
+        }
+    }
+    
+    /**
+     * Download model from HuggingFace automatically
+     */
+    private fun downloadModel(modelName: String) {
+        viewModelScope.launch {
             _state.update { 
                 it.copy(
-                    modelError = "No Whisper model found. Please place a model file (ggml-tiny.bin, ggml-base.bin, or ggml-small.bin) in the app's model directory or assets folder."
+                    isModelDownloading = true,
+                    modelDownloadProgress = 0f,
+                    modelError = null
                 ) 
+            }
+            
+            try {
+                val modelDir = storage.getModelDirectory()
+                val outputFile = File(modelDir, modelName)
+                
+                // Create directory if it doesn't exist
+                modelDir.mkdirs()
+                
+                // HuggingFace direct download URL
+                val url = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/$modelName"
+                Log.d(LOG_TAG, "Downloading model from: $url")
+                
+                withContext(Dispatchers.IO) {
+                    val client = OkHttpClient.Builder()
+                        .build()
+                    
+                    val request = Request.Builder()
+                        .url(url)
+                        .build()
+                    
+                    val response = client.newCall(request).execute()
+                    
+                    if (!response.isSuccessful) {
+                        throw Exception("Failed to download model: ${response.code} ${response.message}")
+                    }
+                    
+                    val body = response.body
+                    val contentLength = body?.contentLength() ?: -1L
+                    val inputStream = body?.byteStream()
+                    
+                    if (inputStream == null) {
+                        throw Exception("Failed to get response body")
+                    }
+                    
+                    FileOutputStream(outputFile).use { outputStream ->
+                        val buffer = ByteArray(8192)
+                        var totalBytesRead = 0L
+                        var bytesRead: Int
+                        
+                        while (inputStream.read(buffer).also { bytesRead = it } != -1) {
+                            outputStream.write(buffer, 0, bytesRead)
+                            totalBytesRead += bytesRead
+                            
+                            // Update progress
+                            if (contentLength > 0) {
+                                val progress = (totalBytesRead.toFloat() / contentLength).coerceIn(0f, 1f)
+                                _state.update { it.copy(modelDownloadProgress = progress) }
+                                
+                                // Log progress every 10%
+                                val progressPercent = (progress * 100).toInt()
+                                if (progressPercent % 10 == 0 && progressPercent > 0) {
+                                    Log.d(LOG_TAG, "Download progress: $progressPercent%")
+                                }
+                            }
+                        }
+                    }
+                    
+                    Log.d(LOG_TAG, "Model downloaded successfully: ${outputFile.absolutePath}")
+                }
+                
+                // Verify file was downloaded
+                if (!outputFile.exists() || outputFile.length() == 0L) {
+                    throw Exception("Downloaded file is empty or missing")
+                }
+                
+                Log.d(LOG_TAG, "Model file size: ${outputFile.length() / (1024 * 1024)} MB")
+                
+                // Load the downloaded model
+                _state.update { 
+                    it.copy(
+                        isModelDownloading = false,
+                        modelDownloadProgress = 1f
+                    ) 
+                }
+                
+                loadModel(outputFile.absolutePath)
+                
+            } catch (e: Exception) {
+                Log.e(LOG_TAG, "Failed to download model", e)
+                _state.update { 
+                    it.copy(
+                        isModelDownloading = false,
+                        modelDownloadProgress = 0f,
+                        modelError = "Failed to download model automatically: ${e.message}. Please check your internet connection and try again."
+                    ) 
+                }
             }
         }
     }

@@ -6,7 +6,9 @@ package com.example.medicalappointmentcompanion.model
 data class AppState(
     val isModelLoaded: Boolean = false,
     val isModelLoading: Boolean = false,
+    val isModelDownloading: Boolean = false,
     val modelLoadProgress: Float = 0f,
+    val modelDownloadProgress: Float = 0f,
     val modelError: String? = null,
     
     val isRecording: Boolean = false,

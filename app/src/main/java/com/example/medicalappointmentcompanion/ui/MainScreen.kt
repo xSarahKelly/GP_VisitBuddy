@@ -154,6 +154,8 @@ fun MainScreen(
                 HomeScreen(
                     isModelLoaded = state.isModelLoaded,
                     isModelLoading = state.isModelLoading,
+                    isModelDownloading = state.isModelDownloading,
+                    modelDownloadProgress = state.modelDownloadProgress,
                     hasPermission = hasPermission,
                     onStartRecording = onStartRecording,
                     onViewPastSummaries = { showPastSummaries = true },
@@ -223,6 +225,8 @@ fun MainScreen(
 private fun HomeScreen(
     isModelLoaded: Boolean,
     isModelLoading: Boolean,
+    isModelDownloading: Boolean,
+    modelDownloadProgress: Float,
     hasPermission: Boolean,
     onStartRecording: () -> Unit,
     onViewPastSummaries: () -> Unit,
@@ -278,9 +282,9 @@ private fun HomeScreen(
                 containerColor = PrimaryBlue
             ),
             shape = RoundedCornerShape(16.dp),
-            enabled = !isModelLoading
+            enabled = !isModelLoading && !isModelDownloading
         ) {
-            if (isModelLoading) {
+            if (isModelLoading || isModelDownloading) {
                 CircularProgressIndicator(
                     modifier = Modifier.size(28.dp),
                     color = Color.White,
@@ -296,7 +300,33 @@ private fun HomeScreen(
         }
         
         // Status message under button
-        if (!isModelLoaded && !isModelLoading) {
+        if (isModelDownloading) {
+            Spacer(modifier = Modifier.height(12.dp))
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                CircularProgressIndicator(
+                    progress = modelDownloadProgress,
+                    modifier = Modifier.size(48.dp),
+                    color = PrimaryBlue,
+                    strokeWidth = 4.dp
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "Downloading speech model... ${(modelDownloadProgress * 100).toInt()}%",
+                    fontSize = 16.sp,
+                    color = TextSecondary,
+                    textAlign = TextAlign.Center
+                )
+                Text(
+                    text = "This will only happen once",
+                    fontSize = 14.sp,
+                    color = TextHint,
+                    textAlign = TextAlign.Center
+                )
+            }
+        } else if (!isModelLoaded && !isModelLoading) {
             Spacer(modifier = Modifier.height(12.dp))
             Text(
                 text = "⚠️ Tap to set up speech model first",
