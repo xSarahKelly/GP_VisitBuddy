@@ -65,11 +65,33 @@ The app tries models in this order:
 
 **Note:** Bundling the model increases APK size. Consider using App Bundle (AAB) format for Play Store to reduce download size.
 
+## Important: Before Building APK
+
+**⚠️ CRITICAL:** The model file must be in `app/src/main/assets/` when you build the APK. 
+
+- If you build on a different machine or from a clean git clone, the model won't be in the APK (it's gitignored)
+- Users will then see a download prompt
+- **Solution:** Always ensure the model file is in assets before building
+
+### Quick Check Before Building:
+```bash
+# Verify model is present
+ls app/src/main/assets/ggml-tiny.bin
+```
+
+If missing, download and place it before building.
+
 ## Testing
 
 After adding model to assets:
-1. Clean and rebuild project
+1. Clean and rebuild project (`Build → Clean Project`, then `Build → Rebuild Project`)
 2. Install on device
 3. App should automatically load model on first launch
 4. No user interaction required!
+
+## For Distribution
+
+If distributing the APK:
+- **Option A:** Include model in assets (APK will be ~75MB+ larger)
+- **Option B:** Don't include model, users download it manually (smaller APK)
 
