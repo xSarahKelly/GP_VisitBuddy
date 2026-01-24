@@ -120,8 +120,76 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             
             Log.d(LOG_TAG, "No model found in any location, attempting automatic download")
             // Automatically download the model
-            downloadModel("ggml-tiny.bin")
+            try {
+                downloadModel("ggml-tiny.bin")
+            } catch (e: Exception) {
+                Log.e(LOG_TAG, "Exception starting download", e)
+                _state.update {
+                    it.copy(
+                        modelError = "Failed to start download: ${e.message}"
+                    )
+                }
+            }
         }
+    }
+    
+    /**
+     * Helper function to download from a specific URL
+     */
+    private suspend fun downloadFromUrl(url: String, outputFile: File) = withContext(Dispatchers.IO) {
+        val client = OkHttpClient.Builder()
+            .followRedirects(true)
+            .followSslRedirects(true)
+            .build()
+        
+        val request = Request.Builder()
+            .url(url)
+            .addHeader("User-Agent", "GP-VisitBuddy/1.0")
+            .build()
+        
+        Log.d(LOG_TAG, "Starting download request to: $url")
+        val response = client.newCall(request).execute()
+        
+        Log.d(LOG_TAG, "Response code: ${response.code}, message: ${response.message}")
+        
+        if (!response.isSuccessful) {
+            val errorBody = response.body?.string() ?: "No error body"
+            Log.e(LOG_TAG, "Download failed. Response body: $errorBody")
+            throw Exception("Failed to download model: HTTP ${response.code} ${response.message}")
+        }
+        
+        val body = response.body
+        val contentLength = body?.contentLength() ?: -1L
+        val inputStream = body?.byteStream()
+        
+        if (inputStream == null) {
+            throw Exception("Failed to get response body")
+        }
+        
+        FileOutputStream(outputFile).use { outputStream ->
+            val buffer = ByteArray(8192)
+            var totalBytesRead = 0L
+            var bytesRead: Int
+            
+            while (inputStream.read(buffer).also { bytesRead = it } != -1) {
+                outputStream.write(buffer, 0, bytesRead)
+                totalBytesRead += bytesRead
+                
+                // Update progress
+                if (contentLength > 0) {
+                    val progress = (totalBytesRead.toFloat() / contentLength).coerceIn(0f, 1f)
+                    _state.update { it.copy(modelDownloadProgress = progress) }
+                    
+                    // Log progress every 10%
+                    val progressPercent = (progress * 100).toInt()
+                    if (progressPercent % 10 == 0 && progressPercent > 0) {
+                        Log.d(LOG_TAG, "Download progress: $progressPercent%")
+                    }
+                }
+            }
+        }
+        
+        Log.d(LOG_TAG, "Model downloaded successfully: ${outputFile.absolutePath}")
     }
     
     /**
@@ -129,6 +197,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      */
     private fun downloadModel(modelName: String) {
         viewModelScope.launch {
+            Log.d(LOG_TAG, "downloadModel() called for: $modelName")
             _state.update { 
                 it.copy(
                     isModelDownloading = true,
@@ -139,61 +208,40 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             
             try {
                 val modelDir = storage.getModelDirectory()
+                Log.d(LOG_TAG, "Model directory: ${modelDir.absolutePath}")
                 val outputFile = File(modelDir, modelName)
                 
                 // Create directory if it doesn't exist
-                modelDir.mkdirs()
+                if (!modelDir.exists()) {
+                    val created = modelDir.mkdirs()
+                    Log.d(LOG_TAG, "Created model directory: $created")
+                }
                 
-                // HuggingFace direct download URL
-                val url = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/$modelName"
-                Log.d(LOG_TAG, "Downloading model from: $url")
+                // HuggingFace direct download URL - try multiple formats
+                val urls = listOf(
+                    "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/$modelName",
+                    "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/$modelName?download=true"
+                )
                 
-                withContext(Dispatchers.IO) {
-                    val client = OkHttpClient.Builder()
-                        .build()
-                    
-                    val request = Request.Builder()
-                        .url(url)
-                        .build()
-                    
-                    val response = client.newCall(request).execute()
-                    
-                    if (!response.isSuccessful) {
-                        throw Exception("Failed to download model: ${response.code} ${response.message}")
-                    }
-                    
-                    val body = response.body
-                    val contentLength = body?.contentLength() ?: -1L
-                    val inputStream = body?.byteStream()
-                    
-                    if (inputStream == null) {
-                        throw Exception("Failed to get response body")
-                    }
-                    
-                    FileOutputStream(outputFile).use { outputStream ->
-                        val buffer = ByteArray(8192)
-                        var totalBytesRead = 0L
-                        var bytesRead: Int
-                        
-                        while (inputStream.read(buffer).also { bytesRead = it } != -1) {
-                            outputStream.write(buffer, 0, bytesRead)
-                            totalBytesRead += bytesRead
-                            
-                            // Update progress
-                            if (contentLength > 0) {
-                                val progress = (totalBytesRead.toFloat() / contentLength).coerceIn(0f, 1f)
-                                _state.update { it.copy(modelDownloadProgress = progress) }
-                                
-                                // Log progress every 10%
-                                val progressPercent = (progress * 100).toInt()
-                                if (progressPercent % 10 == 0 && progressPercent > 0) {
-                                    Log.d(LOG_TAG, "Download progress: $progressPercent%")
-                                }
-                            }
+                var lastException: Exception? = null
+                for (url in urls) {
+                    try {
+                        Log.d(LOG_TAG, "Attempting download from: $url")
+                        downloadFromUrl(url, outputFile)
+                        Log.d(LOG_TAG, "Download successful from: $url")
+                        break // Success, exit loop
+                    } catch (e: Exception) {
+                        Log.w(LOG_TAG, "Download failed from $url: ${e.message}")
+                        lastException = e
+                        if (url != urls.last()) {
+                            Log.d(LOG_TAG, "Trying next URL...")
+                            continue
                         }
                     }
-                    
-                    Log.d(LOG_TAG, "Model downloaded successfully: ${outputFile.absolutePath}")
+                }
+                
+                if (lastException != null && !outputFile.exists()) {
+                    throw lastException ?: Exception("All download URLs failed")
                 }
                 
                 // Verify file was downloaded
@@ -215,11 +263,22 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 
             } catch (e: Exception) {
                 Log.e(LOG_TAG, "Failed to download model", e)
+                e.printStackTrace()
+                val errorMessage = when {
+                    e.message?.contains("Unable to resolve host") == true -> 
+                        "No internet connection. Please check your network and try again."
+                    e.message?.contains("timeout") == true || e.message?.contains("Timeout") == true ->
+                        "Download timed out. Please check your internet connection and try again."
+                    e.message?.contains("HTTP") == true ->
+                        "Server error: ${e.message}. Please try again later."
+                    else ->
+                        "Failed to download model: ${e.message ?: "Unknown error"}. Please check your internet connection and try again."
+                }
                 _state.update { 
                     it.copy(
                         isModelDownloading = false,
                         modelDownloadProgress = 0f,
-                        modelError = "Failed to download model automatically: ${e.message}. Please check your internet connection and try again."
+                        modelError = errorMessage
                     ) 
                 }
             }
