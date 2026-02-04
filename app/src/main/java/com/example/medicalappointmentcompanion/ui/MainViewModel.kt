@@ -65,68 +65,103 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      */
     private fun autoLoadModel() {
         viewModelScope.launch {
-            // First, check if model already exists in internal storage
-            val modelDir = storage.getModelDirectory()
-            val modelNames = listOf("ggml-tiny.bin", "ggml-base.bin", "ggml-small.bin")
+            _state.update { it.copy(isModelLoading = true, modelError = null) }
             
-            for (modelName in modelNames) {
-                val modelFile = File(modelDir, modelName)
-                if (modelFile.exists() && modelFile.length() > 0) {
-                    Log.d(LOG_TAG, "Found model at: ${modelFile.absolutePath}")
-                    loadModel(modelFile.absolutePath)
-                    return@launch
-                }
-            }
-            
-            // If not found, try to copy from assets
             try {
-                val assets = getApplication<Application>().assets
+                // First, check if model already exists in internal storage
+                val modelDir = storage.getModelDirectory()
+                val modelNames = listOf("ggml-tiny.bin", "ggml-base.bin", "ggml-small.bin")
+                
                 for (modelName in modelNames) {
-                    try {
-                        assets.open(modelName).use { inputStream ->
-                            val outputFile = File(modelDir, modelName)
-                            outputFile.outputStream().use { outputStream ->
-                                inputStream.copyTo(outputStream)
-                            }
-                            Log.d(LOG_TAG, "Copied model from assets to: ${outputFile.absolutePath}")
-                            loadModel(outputFile.absolutePath)
-                            return@launch
-                        }
-                    } catch (e: Exception) {
-                        // Model not in assets, try next one
-                        Log.d(LOG_TAG, "Model $modelName not found in assets, trying next")
+                    val modelFile = File(modelDir, modelName)
+                    if (modelFile.exists() && modelFile.length() > 0) {
+                        Log.d(LOG_TAG, "Found model at: ${modelFile.absolutePath}")
+                        loadModel(modelFile.absolutePath)
+                        return@launch
                     }
                 }
-            } catch (e: Exception) {
-                Log.w(LOG_TAG, "Failed to load model from assets", e)
-            }
-            
-            // Fallback: check external locations
-            val externalLocations = listOf(
-                File("/sdcard/Download/ggml-tiny.bin"),
-                File("/sdcard/Download/ggml-base.bin"),
-                File("/storage/emulated/0/Download/ggml-tiny.bin"),
-                File("/storage/emulated/0/Download/ggml-base.bin"),
-                File("/data/local/tmp/ggml-tiny.bin")
-            )
-            
-            for (location in externalLocations) {
-                if (location.exists() && location.length() > 0) {
-                    Log.d(LOG_TAG, "Found model at: ${location.absolutePath}")
-                    loadModel(location.absolutePath)
-                    return@launch
+                
+                // If not found, try to copy from assets (model should be bundled in APK)
+                Log.d(LOG_TAG, "Model not in internal storage, checking assets...")
+                try {
+                    val assets = getApplication<Application>().assets
+                    val assetList = assets.list("")?.toList() ?: emptyList()
+                    Log.d(LOG_TAG, "Assets folder contents: ${assetList.joinToString()}")
+                    
+                    for (modelName in modelNames) {
+                        try {
+                            Log.d(LOG_TAG, "Attempting to open model from assets: $modelName")
+                            assets.open(modelName).use { inputStream ->
+                                val outputFile = File(modelDir, modelName)
+                                // Ensure directory exists
+                                modelDir.mkdirs()
+                                Log.d(LOG_TAG, "Copying model from assets to: ${outputFile.absolutePath}")
+                                
+                                var totalBytes = 0L
+                                outputFile.outputStream().use { outputStream ->
+                                    val buffer = ByteArray(8192)
+                                    var bytesRead: Int
+                                    while (inputStream.read(buffer).also { bytesRead = it } != -1) {
+                                        outputStream.write(buffer, 0, bytesRead)
+                                        totalBytes += bytesRead
+                                    }
+                                }
+                                
+                                val fileSizeMB = outputFile.length() / (1024 * 1024)
+                                Log.d(LOG_TAG, "Successfully copied model from assets. File size: $fileSizeMB MB (copied $totalBytes bytes)")
+                                
+                                if (outputFile.exists() && outputFile.length() > 0) {
+                                    loadModel(outputFile.absolutePath)
+                                    return@launch
+                                } else {
+                                    Log.e(LOG_TAG, "Copied file is empty or missing after copy")
+                                }
+                            }
+                        } catch (e: java.io.FileNotFoundException) {
+                            // Model not in assets, try next one
+                            Log.d(LOG_TAG, "Model $modelName not found in assets (FileNotFoundException), trying next")
+                        } catch (e: Exception) {
+                            Log.w(LOG_TAG, "Error copying model $modelName from assets", e)
+                            e.printStackTrace()
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.e(LOG_TAG, "Failed to access assets", e)
+                    e.printStackTrace()
                 }
-            }
-            
-            Log.d(LOG_TAG, "No model found in any location, attempting automatic download")
-            // Automatically download the model
-            try {
-                downloadModel("ggml-tiny.bin")
-            } catch (e: Exception) {
-                Log.e(LOG_TAG, "Exception starting download", e)
+                
+                // Fallback: check external locations
+                Log.d(LOG_TAG, "Model not in assets, checking external locations...")
+                val externalLocations = listOf(
+                    File("/sdcard/Download/ggml-tiny.bin"),
+                    File("/sdcard/Download/ggml-base.bin"),
+                    File("/storage/emulated/0/Download/ggml-tiny.bin"),
+                    File("/storage/emulated/0/Download/ggml-base.bin"),
+                    File("/data/local/tmp/ggml-tiny.bin")
+                )
+                
+                for (location in externalLocations) {
+                    if (location.exists() && location.length() > 0) {
+                        Log.d(LOG_TAG, "Found model at: ${location.absolutePath}")
+                        loadModel(location.absolutePath)
+                        return@launch
+                    }
+                }
+                
+                Log.e(LOG_TAG, "No model found in any location - model not included in APK")
                 _state.update {
                     it.copy(
-                        modelError = "Failed to start download: ${e.message}"
+                        isModelLoading = false,
+                        modelError = "Model file not found in APK. Please ensure ggml-tiny.bin is in app/src/main/assets/ before building. The model must be included in the APK at build time."
+                    )
+                }
+            } catch (e: Exception) {
+                Log.e(LOG_TAG, "Error in autoLoadModel", e)
+                e.printStackTrace()
+                _state.update {
+                    it.copy(
+                        isModelLoading = false,
+                        modelError = "Error loading model: ${e.message}"
                     )
                 }
             }

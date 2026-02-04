@@ -10,5 +10,6 @@
 .cxx
 local.properties
 
-# Whisper model files (large binaries - download separately)
-app/src/main/assets/*.bin
+# Note: Model files in app/src/main/assets/*.bin should be included for APK builds
+# They are gitignored to keep repo size small, but must be present when building APK
+# app/src/main/assets/*.bin

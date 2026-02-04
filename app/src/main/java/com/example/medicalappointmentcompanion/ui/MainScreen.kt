@@ -103,9 +103,9 @@ fun MainScreen(
         }
     }
     
-    // Show model dialog if not loaded
-    LaunchedEffect(state.isModelLoaded, state.isModelLoading) {
-        if (!state.isModelLoaded && !state.isModelLoading && state.modelError != null) {
+    // Show model dialog if not loaded (but not if downloading)
+    LaunchedEffect(state.isModelLoaded, state.isModelLoading, state.isModelDownloading) {
+        if (!state.isModelLoaded && !state.isModelLoading && !state.isModelDownloading && state.modelError != null) {
             showModelDialog = true
         }
     }
@@ -1259,11 +1259,13 @@ private fun ModelSetupDialog(
                 Spacer(modifier = Modifier.height(12.dp))
                 
                 Text(
-                    text = "1. Download ggml-tiny.bin (~75MB)\n" +
-                           "   from huggingface.co/ggerganov/whisper.cpp\n\n" +
-                           "2. Connect device via USB\n\n" +
-                           "3. Run in terminal:\n" +
-                           "   adb push ggml-tiny.bin /sdcard/Download/",
+                    text = "The model file (ggml-tiny.bin) should be included in the APK.\n\n" +
+                           "If you're seeing this message, the model wasn't found in the app's assets.\n\n" +
+                           "To fix:\n" +
+                           "1. Ensure ggml-tiny.bin is in app/src/main/assets/\n" +
+                           "2. Clean and rebuild the project\n" +
+                           "3. Reinstall the APK\n\n" +
+                           "The model file must be present when building the APK.",
                     fontSize = 16.sp,
                     color = TextSecondary,
                     lineHeight = 24.sp

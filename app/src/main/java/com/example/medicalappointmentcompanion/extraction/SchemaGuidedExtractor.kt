@@ -37,7 +37,8 @@ object SchemaGuidedExtractor {
         "milligrams", "mg", "micrograms", "mcg", "millilitres", "ml"
     )
     
-    // Common medications prescribed in Ireland
+    
+    // Common medications prescribed in Ireland (correct spellings only)
     private val COMMON_MEDICATIONS = listOf(
         // Pain relief
         "paracetamol", "ibuprofen", "aspirin", "codeine", "tramadol",
@@ -45,7 +46,7 @@ object SchemaGuidedExtractor {
         "ponstan", "mefenamic acid", "co-dydramol", "nurofen",
         
         // Antibiotics 
-        "amoxicillin", "amoxosilin", "a moxosilin", "a moxicillin", "amoxacillin",
+        "amoxicillin",
         "augmentin", "co-amoxiclav", "flucloxacillin",
         "doxycycline", "clarithromycin", "azithromycin", "metronidazole",
         "trimethoprim", "nitrofurantoin", "ciprofloxacin", "penicillin",
@@ -536,23 +537,40 @@ object SchemaGuidedExtractor {
      * - Misspellings: "moxosilin" -> "amoxicillin"
      * - Case variations
      * - Articles: "a amoxicillin" -> "amoxicillin"
+     * - Different accents/pronunciations
      */
     private fun findMedicationName(sentence: String): String? {
-        // First try exact match
+        val lowerSentence = sentence.lowercase()
+        
+        // Step 1: Check exact match in COMMON_MEDICATIONS
         val exactMatch = COMMON_MEDICATIONS.firstOrNull { 
-            sentence.contains(it) 
+            lowerSentence.contains(it) 
         }
         if (exactMatch != null) {
             return exactMatch.replaceFirstChar { it.uppercase() }
         }
         
-        // Normalize sentence: remove common articles and extra spaces
-        val normalized = sentence
+        // Step 2: Check MedicationVariations mapping (handles known transcription errors)
+        for ((variation, correctName) in MedicationVariations.VARIATIONS) {
+            if (lowerSentence.contains(variation)) {
+                return correctName.replaceFirstChar { it.uppercase() }
+            }
+        }
+        
+        // Step 3: Normalize sentence: remove common articles and extra spaces
+        val normalized = lowerSentence
             .replace(Regex("\\b(a|an|the)\\s+"), "") // Remove articles
             .replace(" ", "") // Remove all spaces
-            .lowercase()
         
-        // Check each medication
+        // Step 4: Check normalized variations in mapping
+        for ((variation, correctName) in MedicationVariations.VARIATIONS) {
+            val normalizedVariation = variation.replace(" ", "").lowercase()
+            if (normalized.contains(normalizedVariation)) {
+                return correctName.replaceFirstChar { it.uppercase() }
+            }
+        }
+        
+        // Step 5: Check normalized medications
         for (medication in COMMON_MEDICATIONS) {
             val medNormalized = medication.replace(" ", "").lowercase()
             
@@ -574,6 +592,7 @@ object SchemaGuidedExtractor {
      * Simple fuzzy matching - checks if medication name appears in text
      * with allowance for transcription errors (missing/extra characters)
      * Handles cases like "moxosilin" -> "amoxicillin"
+     * Note: Known variations should be in MEDICATION_VARIATIONS map first
      */
     private fun fuzzyMatch(medication: String, text: String): Boolean {
         // If medication is short, require exact match
@@ -581,25 +600,6 @@ object SchemaGuidedExtractor {
         
         // Check if medication appears as substring
         if (text.contains(medication)) return true
-        
-        // Check for common transcription errors in medication names
-        // Map common misspellings
-        val commonErrors = mapOf(
-            "moxosilin" to "amoxicillin",
-            "moxocillin" to "amoxicillin",
-            "a moxosilin" to "amoxicillin",
-            "a moxocillin" to "amoxicillin",
-            "moxicillin" to "amoxicillin",
-            "amoxacillin" to "amoxicillin",
-            "amoxocillin" to "amoxicillin"
-        )
-        
-        // Check if text contains a common misspelling that maps to this medication
-        for ((misspelling, correct) in commonErrors) {
-            if (text.contains(misspelling) && medication == correct) {
-                return true
-            }
-        }
         
         // Check similarity - if 75%+ of characters match in order, consider it a match
         val similarity = calculateSimilarity(medication, text)
