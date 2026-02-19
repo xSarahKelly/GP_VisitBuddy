@@ -13,14 +13,19 @@ package com.example.medicalappointmentcompanion.extraction
  * - Hyphen variations
  * - Articles with spaces (e.g., "a moxosilin")
  */
-object MedicationVariations {
+object WordVariations {
     
     /**
-     * Map of transcription variations to correct medication spellings
+     * Master Map of transcription variations to correct word spellings
      * Key: transcription variation (lowercase)
-     * Value: correct medication name (as it appears in COMMON_MEDICATIONS)
+     * Value: phrase expected by extraction regex
      */
     val VARIATIONS: Map<String, String> = mapOf(
+
+        // ==============================
+        // MEDICATION VARIATIONS
+        // ==============================
+
         // Amoxicillin variations
         "amoxosilin" to "amoxicillin",
         "a moxosilin" to "amoxicillin",
@@ -126,7 +131,111 @@ object MedicationVariations {
         "folicacid" to "folic acid",
         "vitamind" to "vitamin d",
         "ferrousfumarate" to "ferrous fumarate",
-        "ferroussulfate" to "ferrous sulfate"
-    )
+        "ferroussulfate" to "ferrous sulfate",
+
+
+        // ==============================
+        // FREQUENCY VARIATIONS
+        // ==============================
+
+        // Once / daily
+        "once aday" to "once a day",
+        "once per day" to "once a day",
+        "one a day" to "once a day",
+        "1 a day" to "once a day",
+        "ones a day" to "once a day",
+
+        // Twice
+        "twice aday" to "twice a day",
+        "2 a day" to "twice a day",
+        "two a day" to "twice a day",
+        "twice today" to "twice a day",
+
+        // Three times
+        "3 times a day" to "three times a day",
+        "three times aday" to "three times a day",
+
+        // Four times
+        "4 times a day" to "four times a day",
+        "for times a day" to "four times a day",
+
+        // Morning / evening / night
+        "every warning" to "every morning",
+        "in the warning" to "in the morning",
+        "every nite" to "every night",
+        "at nite" to "at night",
+        "at bed time" to "at bedtime",
+        "at bed-time" to "at bedtime",
+
+        // Meals / food
+        "with break fast" to "with breakfast",
+        "with brekfast" to "with breakfast",
+        "with diner" to "with dinner",
+        "after meals" to "after food",
+        "before meals" to "before food",
+        "empty stomach" to "on an empty stomach",
+
+        // Every X hours
+        "every six hours" to "every 6 hours",
+        "every six ours" to "every 6 hours",
+        "every 6 hour" to "every 6 hours",
+        "every eight hours" to "every 8 hours",
+        "every 8 hour" to "every 8 hours",
+        "every twelve hours" to "every 12 hours",
+        "every 12 hour" to "every 12 hours",
+        "every 2-4 hours" to "every 2 to 4 hours",
+        "every two to four hours" to "every 2 to 4 hours",
+
+        // PRN
+        "p r n" to "prn",
+        "p.r.n" to "prn",
+        "pr n" to "prn",
+        "as kneaded" to "as needed",
+        "as need it" to "as needed",
+        "when you need it" to "when needed",
+
+
+        // ==============================
+        // DURATION VARIATIONS
+        // ==============================
+
+        // Weeks / months
+        "for a weak" to "for a week",
+        "for 1 week" to "for a week",
+        "for two weeks" to "for 2 weeks",
+        "for three weeks" to "for 3 weeks",
+        "for three months" to "for 3 months",
+        "for six months" to "for 6 months",
+
+        // Until phrases
+        "until its gone" to "until gone",
+        "until it's gone" to "until gone",
+        "until the course is completed" to "until the course is complete",
+        "until symptoms get better" to "until symptoms improve",
+
+        // Long term
+        "longturn" to "long term",
+        "long-term" to "long term",
+        "on going" to "ongoing",
+        "in definitely" to "indefinitely",
+        "indefinately" to "indefinitely",
+        "perminently" to "permanently"
+
+        )
+    /**
+     * Safe normalization using word boundaries.
+     * Prevents replacing substrings inside other words.
+     */
+    fun normalize(text: String): String {
+        var normalized = text.lowercase()
+
+        VARIATIONS.forEach { (variant, canonical) ->
+            val pattern = Regex("\\b${Regex.escape(variant)}\\b")
+            normalized = normalized.replace(pattern, canonical)
+        }
+
+        return normalized
+    }
 }
+
 

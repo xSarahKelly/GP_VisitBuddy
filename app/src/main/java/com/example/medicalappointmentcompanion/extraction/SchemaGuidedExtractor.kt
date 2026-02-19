@@ -38,7 +38,7 @@ object SchemaGuidedExtractor {
     )
     
     
-    // Common medications prescribed in Ireland (correct spellings only)
+    // Common medications prescribed in Ireland
     private val COMMON_MEDICATIONS = listOf(
         // Pain relief
         "paracetamol", "ibuprofen", "aspirin", "codeine", "tramadol",
@@ -551,7 +551,7 @@ object SchemaGuidedExtractor {
         }
         
         // Step 2: Check MedicationVariations mapping (handles known transcription errors)
-        for ((variation, correctName) in MedicationVariations.VARIATIONS) {
+        for ((variation, correctName) in WordVariations.VARIATIONS) {
             if (lowerSentence.contains(variation)) {
                 return correctName.replaceFirstChar { it.uppercase() }
             }
@@ -563,7 +563,7 @@ object SchemaGuidedExtractor {
             .replace(" ", "") // Remove all spaces
         
         // Step 4: Check normalized variations in mapping
-        for ((variation, correctName) in MedicationVariations.VARIATIONS) {
+        for ((variation, correctName) in WordVariations.VARIATIONS) {
             val normalizedVariation = variation.replace(" ", "").lowercase()
             if (normalized.contains(normalizedVariation)) {
                 return correctName.replaceFirstChar { it.uppercase() }
