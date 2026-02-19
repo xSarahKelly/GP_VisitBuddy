@@ -127,15 +127,19 @@ object SchemaGuidedExtractor {
         "ferrous sulfate", "calcichew", "adcal"
     )
     
-    // Frequency patterns
+    // Frequency patterns 
     private val FREQUENCY_PATTERNS = listOf(
         "once a day", "twice a day", "three times a day", "four times a day",
         "once daily", "twice daily", "three times daily",
+        "\\d+ times a day", "\\d+ times daily",
         "every morning", "every evening", "every night", "at night", "at bedtime",
         "every \\d+ hours?", "every \\d+ to \\d+ hours?",
         "in the morning", "in the evening", "with breakfast", "with lunch", "with dinner",
-        "with food", "with meals", "after food", "before food", "on an empty stomach",
-        "as needed", "when needed", "when required", "as required", "prn"
+        "with your evening meal", "with your morning meal",
+        "with food", "with meals", "after food", "before food", "before breakfast",
+        "on an empty stomach",
+        "as needed", "when needed", "when required", "as required", "prn",
+        "tds", "bd", "od", "qds", "mane", "nocte"
     )
     
     // Duration patterns  
@@ -244,7 +248,7 @@ object SchemaGuidedExtractor {
         val medications = mutableListOf<MedicationInstruction>()
         
         // First pass: Look for medications with triggers in same sentence
-        for (sentence in sentences) {
+        for ((i, sentence) in sentences.withIndex()) {
             val lowerSentence = sentence.lowercase()
             
             // Check if sentence contains medication triggers
@@ -255,54 +259,38 @@ object SchemaGuidedExtractor {
             val medicationName = findMedicationName(lowerSentence)
             
             if (medicationName != null) {
-                medications.add(
-                    MedicationInstruction(
-                        medicineName = medicationName,
-                        dosage = extractDosage(lowerSentence),
-                        frequency = extractFrequency(lowerSentence),
-                        duration = extractDuration(lowerSentence),
-                        specialInstructions = extractSpecialInstructions(lowerSentence),
-                        verbatimQuote = sentence.trim()
-                    )
+                val med = buildMedicationFromSentences(
+                    medicationName, sentence.trim(), sentences, i
                 )
+                medications.add(med)
             }
         }
         
-        // Second pass: Look for medications even without explicit triggers
+        // Second pass: Look for medications without explicit triggers
         // (in case trigger is in previous sentence, e.g., "I'm prescribing..." then "amoxicillin 500mg...")
         for (i in sentences.indices) {
             val sentence = sentences[i]
             val lowerSentence = sentence.lowercase()
             
-            // Check if this sentence contains a medication name - handle transcription errors
             val medicationName = findMedicationName(lowerSentence)
             
             if (medicationName != null) {
-                // Check if we already extracted this medication
                 val alreadyExtracted = medications.any { 
                     it.medicineName.equals(medicationName, ignoreCase = true) 
                 }
                 
                 if (!alreadyExtracted) {
-                    // Check if previous sentence had a trigger, or if this sentence has dosage/frequency
                     val hasDosageOrFrequency = extractDosage(lowerSentence) != null || 
                                               extractFrequency(lowerSentence) != null
                     val prevSentenceHasTrigger = i > 0 && MEDICATION_TRIGGERS.any { 
                         sentences[i - 1].lowercase().contains(it) 
                     }
                     
-                    // Extract if there's dosage/frequency (strong indicator) or trigger in previous sentence
                     if (hasDosageOrFrequency || prevSentenceHasTrigger) {
-                        medications.add(
-                            MedicationInstruction(
-                                medicineName = medicationName,
-                                dosage = extractDosage(lowerSentence),
-                                frequency = extractFrequency(lowerSentence),
-                                duration = extractDuration(lowerSentence),
-                                specialInstructions = extractSpecialInstructions(lowerSentence),
-                                verbatimQuote = sentence.trim()
-                            )
+                        val med = buildMedicationFromSentences(
+                            medicationName, sentence.trim(), sentences, i
                         )
+                        medications.add(med)
                     }
                 }
             }
@@ -311,13 +299,54 @@ object SchemaGuidedExtractor {
         return medications.distinctBy { it.medicineName.lowercase() }
     }
     
+    /**
+     * Build medication instruction from following sentences when dosage,
+     * frequency, duration or special instructions are in the next sentence.
+     * E.g. "Take amoxicillin." "500mg three times a day with food."
+     */
+    private fun buildMedicationFromSentences(
+        medicationName: String,
+        verbatimQuote: String,
+        sentences: List<String>,
+        sentenceIndex: Int
+    ): MedicationInstruction {
+        var dosage = extractDosage(sentences[sentenceIndex].lowercase())
+        var frequency = extractFrequency(sentences[sentenceIndex].lowercase())
+        var duration = extractDuration(sentences[sentenceIndex].lowercase())
+        var specialInstructions = extractSpecialInstructions(sentences[sentenceIndex].lowercase())
+        
+        // from next 2 sentences (doctor continues with "Take it with food" etc.)
+        for (j in (sentenceIndex + 1)..minOf(sentenceIndex + 2, sentences.size - 1)) {
+            val next = sentences[j].lowercase()
+            if (dosage == null) dosage = extractDosage(next)
+            if (frequency == null) frequency = extractFrequency(next)
+            if (duration == null) duration = extractDuration(next)
+            if (specialInstructions == null) specialInstructions = extractSpecialInstructions(next)
+        }
+        
+        return MedicationInstruction(
+            medicineName = medicationName,
+            dosage = dosage,
+            frequency = frequency,
+            duration = duration,
+            specialInstructions = specialInstructions,
+            verbatimQuote = verbatimQuote
+        )
+    }
+    
     private fun extractDosage(sentence: String): String? {
-        // Pattern: number + unit (mg, ml, tablets, etc.)
+        // Pattern: number + unit (mg, ml, tablets, iu, etc.)
         val dosagePattern = Regex(
-            """(\d+(?:\.\d+)?)\s*(mg|milligrams?|mcg|micrograms?|ml|millilitres?|tablets?|pills?|capsules?)""",
+            """(\d+(?:\.\d+)?)\s*(mg|milligrams?|mcg|micrograms?|ml|millilitres?|tablets?|pills?|capsules?|iu|international\s*units?|units?)""",
             RegexOption.IGNORE_CASE
         )
-        return dosagePattern.find(sentence)?.value
+        dosagePattern.find(sentence)?.let { return it.value.trim() }
+        // Word numbers + units: "one tablet", "two tablets"
+        val wordDosage = Regex(
+            """(one|two|three|four|five|half)(?:\s+a)?\s+(tablets?|pills?|capsules?|mg|ml)""",
+            RegexOption.IGNORE_CASE
+        )
+        return wordDosage.find(sentence)?.value
     }
     
     private fun extractFrequency(sentence: String): String? {
@@ -339,8 +368,11 @@ object SchemaGuidedExtractor {
     private fun extractSpecialInstructions(sentence: String): String? {
         val instructions = listOf(
             "with food", "with meals", "after food", "before food",
+            "before breakfast", "with breakfast", "with your evening meal",
+            "with lunch", "with dinner",
             "on an empty stomach", "with water", "with plenty of water",
-            "do not crush", "do not chew", "swallow whole"
+            "do not crush", "do not chew", "swallow whole",
+            "avoid alcohol", "take it with food"
         )
         return instructions.firstOrNull { sentence.contains(it) }
     }

@@ -660,7 +660,8 @@ private fun SummaryScreen(
                                     append(med.medicineName)
                                     med.dosage?.let { append(" $it") }
                                     med.frequency?.let { append(" $it") }
-                                    med.specialInstructions?.let { append(", $it") }
+                                    med.duration?.let { append(", $it") }
+                                    med.specialInstructions?.let { append(" ($it)") }
                                 }
                             )
                         }
