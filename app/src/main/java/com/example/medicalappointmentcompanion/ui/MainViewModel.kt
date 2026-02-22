@@ -70,7 +70,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 // First, check if model already exists in internal storage
                 val modelDir = storage.getModelDirectory()
-                val modelNames = listOf("ggml-tiny.bin", "ggml-base.bin", "ggml-small.bin")
+                val modelNames = listOf("ggml-small.en.bin", "ggml-base.en.bin", "ggml-tiny.bin", "ggml-base.bin")
                 
                 for (modelName in modelNames) {
                     val modelFile = File(modelDir, modelName)
@@ -133,11 +133,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 // Fallback: check external locations
                 Log.d(LOG_TAG, "Model not in assets, checking external locations...")
                 val externalLocations = listOf(
+                    File("/sdcard/Download/ggml-small.en.bin"),
+                    File("/sdcard/Download/ggml-base.en.bin"),
                     File("/sdcard/Download/ggml-tiny.bin"),
-                    File("/sdcard/Download/ggml-base.bin"),
-                    File("/storage/emulated/0/Download/ggml-tiny.bin"),
-                    File("/storage/emulated/0/Download/ggml-base.bin"),
-                    File("/data/local/tmp/ggml-tiny.bin")
+                    File("/storage/emulated/0/Download/ggml-small.en.bin"),
+                    File("/storage/emulated/0/Download/ggml-base.en.bin"),
+                    File("/data/local/tmp/ggml-small.en.bin")
                 )
                 
                 for (location in externalLocations) {
@@ -152,7 +153,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _state.update {
                     it.copy(
                         isModelLoading = false,
-                        modelError = "Model file not found in APK. Please ensure ggml-tiny.bin is in app/src/main/assets/ before building. The model must be included in the APK at build time."
+                        modelError = "Model file not found in APK. Please ensure ggml-small.en.bin (or ggml-base.en.bin) is in app/src/main/assets/ before building. The model must be included in the APK at build time."
                     )
                 }
             } catch (e: Exception) {

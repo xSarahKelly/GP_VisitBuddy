@@ -76,12 +76,19 @@ android {
     tasks.configureEach {
         if (name == "preBuild") {
             doFirst {
-                val modelFile = file("src/main/assets/ggml-tiny.bin")
+                val modelFile = file("src/main/assets/ggml-small.en.bin")
                 if (!modelFile.exists()) {
-                    println("⚠️  WARNING: Model file not found in assets!")
-                    println("   Place ggml-tiny.bin in app/src/main/assets/ before building")
+                    val fallback = file("src/main/assets/ggml-base.en.bin")
+                    if (fallback.exists()) {
+                        val sizeMB = fallback.length() / (1024.0 * 1024.0)
+                        println("✓ Model file found: ${fallback.name} (${String.format("%.1f", sizeMB)} MB)")
+                    } else {
+                        println("⚠️  WARNING: Model file not found in assets!")
+                        println("   Place ggml-small.en.bin in app/src/main/assets/ before building")
                     println("   Download from: https://huggingface.co/ggerganov/whisper.cpp/tree/main")
                     println("   The APK will work but users will need to manually download the model.")
+                        println("   Or use ggml-base.en.bin (~142MB) as fallback.")
+                    }
                 } else {
                     val sizeMB = modelFile.length() / (1024.0 * 1024.0)
                     println("✓ Model file found: ${modelFile.name} (${String.format("%.1f", sizeMB)} MB)")
