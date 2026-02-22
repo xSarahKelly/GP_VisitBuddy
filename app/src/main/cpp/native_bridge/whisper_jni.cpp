@@ -223,8 +223,21 @@ Java_com_example_medicalappointmentcompanion_whisper_WhisperLib_00024Companion_f
         LOGW("Audio appears silent! avg_abs=%.6f", avg_abs);
     }
     
-    // Configure transcription parameters for medical conversations
-    struct whisper_full_params params = whisper_full_default_params(WHISPER_SAMPLING_GREEDY);
+    struct whisper_full_params params = whisper_full_default_params(WHISPER_SAMPLING_BEAM_SEARCH);
+    params.beam_search.beam_size = 8;
+
+    // nudge model towards med names (they sometimes come out wrong)
+    params.initial_prompt =
+            "Medical consultation. Medication names and dosing. "
+            "paracetamol, amoxicillin, augmentin, omeprazole, sertraline, "
+            "metformin, ramipril, atorvastatin, salbutamol. "
+            "mg tablets capsules once daily twice daily.";
+    params.carry_initial_prompt = true;
+
+    params.temperature     = 0.0f;
+    params.temperature_inc = 0.2f;
+    params.logprob_thold   = -1.0f;
+
     params.print_realtime = false;
     params.print_progress = false;
     params.print_timestamps = true;
@@ -235,11 +248,13 @@ Java_com_example_medicalappointmentcompanion_whisper_WhisperLib_00024Companion_f
     params.offset_ms = 0;
     params.no_context = true;
     params.single_segment = false;
-    
-    // Tune for potentially quiet audio
-    params.entropy_thold = 2.8f;        // Increase from default 2.4 (less strict)
-    params.logprob_thold = -1.5f;       // Increase from default -1.0 (less strict)
-    params.no_speech_thold = 0.3f;      // Decrease from default 0.6 (more sensitive)
+
+    params.entropy_thold = 2.8f;
+    params.no_speech_thold = 0.3f;
+
+    // extra padding so med words don't get cut at segment edges
+    params.vad_params.speech_pad_ms = 350;
+    params.vad_params.samples_overlap = 0.3f;
     
     whisper_reset_timings(context);
     
