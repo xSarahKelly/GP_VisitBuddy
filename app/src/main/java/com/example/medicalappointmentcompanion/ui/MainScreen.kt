@@ -474,7 +474,7 @@ private fun RecordingScreen(
                     .padding(20.dp)
             ) {
                 Text(
-                    text = "Doctor: Take two paracetamol...",
+                    text = "Doctor: Take paracetamol 500mg...",
                     fontSize = 20.sp,
                     color = TextSecondary.copy(alpha = 0.6f),
                     fontStyle = FontStyle.Italic
@@ -1260,10 +1260,10 @@ private fun ModelSetupDialog(
                 Spacer(modifier = Modifier.height(12.dp))
                 
                 Text(
-                    text = "The model file (ggml-tiny.bin) should be included in the APK.\n\n" +
+                    text = "The model file (ggml-small.en.bin) should be included in the APK.\n\n" +
                            "If you're seeing this message, the model wasn't found in the app's assets.\n\n" +
                            "To fix:\n" +
-                           "1. Ensure ggml-tiny.bin is in app/src/main/assets/\n" +
+                           "1. Ensure ggml-small.en.bin is in app/src/main/assets/\n" +
                            "2. Clean and rebuild the project\n" +
                            "3. Reinstall the APK\n\n" +
                            "The model file must be present when building the APK.",
