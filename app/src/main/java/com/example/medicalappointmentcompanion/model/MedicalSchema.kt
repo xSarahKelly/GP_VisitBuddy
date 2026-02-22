@@ -1,26 +1,6 @@
 package com.example.medicalappointmentcompanion.model
 
-/**
- * Medical Extraction Schema
- * 
- * Grounded in the Calgary-Cambridge model (stages 4 and 5)
- * 
- * Design Principles:
- * - Extract only EXPLICITLY stated information (no inference)
- * - Copy EXACT phrases from the transcript
- * - Prioritise patient recall and safety
- * - Remain explainable and auditable
- * - Be usable by patients and carers
- * 
- * This schema justifies NOT using generative summarisation.
- * 
- * EXPLICIT EXCLUSIONS (not extracted):
- * - Diagnoses
- * - Interpretations
- * - Treatment reasoning
- * - Inferred intent
- * - Medical opinions
- */
+/** What we pull from transcript – meds, tests, follow-ups, safety. Only what's actually said. */
 data class MedicalExtraction(
     val appointmentMetadata: AppointmentMetadata = AppointmentMetadata(),
     val medicationInstructions: List<MedicationInstruction> = emptyList(),
@@ -31,37 +11,14 @@ data class MedicalExtraction(
     val extractionTimestamp: Long = System.currentTimeMillis()
 )
 
-/**
- * Appointment Metadata
- * 
- * Purpose: Context, NOT clinical decision-making
- * - Optional fields
- * - Not evaluated for accuracy
- * - Useful for user orientation
- */
+/** date, doctor, duration – just for context */
 data class AppointmentMetadata(
     val date: String? = null,
     val doctorOrClinic: String? = null,
     val recordingDurationSeconds: Int? = null
 )
 
-/**
- * Medication Instructions - MOST IMPORTANT
- * 
- * Highest patient recall failure rate
- * Highest safety risk
- * Strongest justification in literature
- * 
- * Extract ONLY if explicitly spoken, e.g.:
- * "Take amoxicillin 500 milligrams three times a day for seven days"
- * 
- * @param medicineName Exact name as spoken
- * @param dosage Exact dosage as spoken (e.g., "500 milligrams", "two tablets")
- * @param frequency Exact frequency as spoken (e.g., "three times a day", "every 8 hours")
- * @param duration Exact duration as spoken (e.g., "for seven days", "until finished")
- * @param specialInstructions Exact instructions (e.g., "with food", "before bed")
- * @param verbatimQuote The exact quote from transcript for auditability
- */
+/** med name, dose, how often, how long, special instructions. Keep verbatim quote. */
 data class MedicationInstruction(
     val medicineName: String,
     val dosage: String? = null,
@@ -71,20 +28,7 @@ data class MedicationInstruction(
     val verbatimQuote: String? = null
 )
 
-/**
- * Tests and Referrals
- * 
- * Examples:
- * - "I'm referring you for a blood test"
- * - "You'll need an X-ray urgently"
- * 
- * No guessing if urgency is not stated.
- * 
- * @param testOrReferralType Exact type as spoken
- * @param reasonIfStated Only if EXPLICITLY stated
- * @param urgency Only if EXPLICITLY stated (null if not mentioned)
- * @param verbatimQuote The exact quote from transcript
- */
+/** blood test, X-ray, etc. Urgency only if they said it. */
 data class TestOrReferral(
     val testOrReferralType: String,
     val reasonIfStated: String? = null,
@@ -92,18 +36,7 @@ data class TestOrReferral(
     val verbatimQuote: String? = null
 )
 
-/**
- * Follow-Up Instructions
- * 
- * Examples:
- * - "Come back in two weeks"
- * - "Book a follow-up with reception"
- * 
- * @param followUpRequired True if follow-up explicitly mentioned
- * @param timeframe Exact timeframe as spoken (e.g., "in two weeks")
- * @param locationOrMethod Exact location/method as spoken
- * @param verbatimQuote The exact quote from transcript
- */
+/** come back in X weeks, book with reception, etc */
 data class FollowUpInstruction(
     val followUpRequired: Boolean = true,
     val timeframe: String? = null,
@@ -111,40 +44,10 @@ data class FollowUpInstruction(
     val verbatimQuote: String? = null
 )
 
-/**
- * Safety Advice / Red Flags
- * 
- * Often missed by AI scribes
- * 
- * Examples:
- * - "If you develop a fever"
- * - "Go to A&E if the pain gets worse"
- * 
- * @param warning Exact warning phrase as spoken
- * @param verbatimQuote The exact quote from transcript
- */
+/** if you get X go to A&E, stop taking if, etc */
 data class SafetyWarning(
     val warning: String,
     val verbatimQuote: String? = null
 )
 
-/**
- * Extraction confidence levels
- * Used internally to track extraction quality
- */
-enum class ExtractionConfidence {
-    HIGH,    // Clear, unambiguous match
-    MEDIUM,  // Partial match, may need review
-    LOW      // Weak match, flagged for user review
-}
-
-/**
- * Wrapper for extracted items with confidence
- */
-data class ExtractedItem<T>(
-    val item: T,
-    val confidence: ExtractionConfidence,
-    val sourceStartIndex: Int,
-    val sourceEndIndex: Int
-)
 

@@ -1,44 +1,15 @@
 package com.example.medicalappointmentcompanion.extraction
 
+import com.example.medicalappointmentcompanion.extraction.WordVariations
 import com.example.medicalappointmentcompanion.model.*
 
 /**
- * Schema-Guided Medical Information Extractor
- * 
- * Grounded in Calgary-Cambridge model (stages 4 and 5)
- * 
- * DESIGN PRINCIPLES:
- * 1. Extract ONLY explicitly stated information (NO inference)
- * 2. Copy EXACT phrases from transcript
- * 3. Prioritise patient recall and safety
- * 4. Remain explainable and auditable
- * 5. Be usable by patients and carers
- * 
- * EXPLICIT EXCLUSIONS (NEVER extracted):
- * - Diagnoses
- * - Interpretations  
- * - Treatment reasoning
- * - Inferred intent
- * - Medical opinions
+ * Pulls out meds, tests, follow-ups, safety stuff from transcript.
+ * Only what's actually said – no guessing.
  */
 object SchemaGuidedExtractor {
     
-    // ========================================================================
-    // KEYWORD LISTS - Frozen, no scope creep
-    // ========================================================================
-    
-    // Medication trigger phrases
-    private val MEDICATION_TRIGGERS = listOf(
-        "take", "taking", "prescribe", "prescribed", "prescribing",
-        "start", "starting", "begin", "beginning",
-        "continue", "continuing", "keep taking",
-        "medication", "medicine", "tablet", "tablets", "pill", "pills",
-        "capsule", "capsules", "dose", "dosage",
-        "milligrams", "mg", "micrograms", "mcg", "millilitres", "ml"
-    )
-    
-    
-    // Common medications prescribed in Ireland
+    // meds we recognise (Ireland GP stuff)
     private val COMMON_MEDICATIONS = listOf(
         // Pain relief
         "paracetamol", "ibuprofen", "aspirin", "codeine", "tramadol",
@@ -154,6 +125,7 @@ object SchemaGuidedExtractor {
     // Test/Referral triggers
     private val TEST_REFERRAL_TRIGGERS = listOf(
         "blood test", "blood tests", "bloods",
+        "swabs", "swab",
         "x-ray", "xray", "scan", "ct scan", "mri", "ultrasound",
         "ecg", "ekg", "echocardiogram",
         "urine test", "urine sample", "stool sample",
@@ -251,12 +223,12 @@ object SchemaGuidedExtractor {
         for ((i, sentence) in sentences.withIndex()) {
             val lowerSentence = sentence.lowercase()
             
-            // Check if sentence contains medication triggers
-            val hasTrigger = MEDICATION_TRIGGERS.any { lowerSentence.contains(it) }
-            if (!hasTrigger) continue
+            if (!WordVariations.isMedicationContext(lowerSentence)) continue
             
-            // Find medication name - handle transcription errors (spaces, misspellings)
-            val medicationName = findMedicationName(lowerSentence)
+            // fix phrases then med spellings
+            val textForExtraction = normaliseForMedExtraction(lowerSentence)
+            
+            val medicationName = findMedicationName(textForExtraction)
             
             if (medicationName != null) {
                 val med = buildMedicationFromSentences(
@@ -266,13 +238,13 @@ object SchemaGuidedExtractor {
             }
         }
         
-        // Second pass: Look for medications without explicit triggers
-        // (in case trigger is in previous sentence, e.g., "I'm prescribing..." then "amoxicillin 500mg...")
+        // second pass in case "I'm prescribing" was in prev sentence
         for (i in sentences.indices) {
             val sentence = sentences[i]
             val lowerSentence = sentence.lowercase()
+            val textForExtraction = normaliseForMedExtraction(lowerSentence)
             
-            val medicationName = findMedicationName(lowerSentence)
+            val medicationName = findMedicationName(textForExtraction)
             
             if (medicationName != null) {
                 val alreadyExtracted = medications.any { 
@@ -280,11 +252,12 @@ object SchemaGuidedExtractor {
                 }
                 
                 if (!alreadyExtracted) {
-                    val hasDosageOrFrequency = extractDosage(lowerSentence) != null || 
-                                              extractFrequency(lowerSentence) != null
-                    val prevSentenceHasTrigger = i > 0 && MEDICATION_TRIGGERS.any { 
-                        sentences[i - 1].lowercase().contains(it) 
-                    }
+                    val normSentence = textForExtraction
+                    val hasDosageOrFrequency = extractDosage(normSentence) != null || 
+                                              extractFrequency(normSentence) != null
+                    val prevSentenceHasTrigger = i > 0 && WordVariations.isMedicationContext(
+                        sentences[i - 1].lowercase()
+                    )
                     
                     if (hasDosageOrFrequency || prevSentenceHasTrigger) {
                         val med = buildMedicationFromSentences(
@@ -299,25 +272,29 @@ object SchemaGuidedExtractor {
         return medications.distinctBy { it.medicineName.lowercase() }
     }
     
-    /**
-     * Build medication instruction from following sentences when dosage,
-     * frequency, duration or special instructions are in the next sentence.
-     * E.g. "Take amoxicillin." "500mg three times a day with food."
-     */
+    /** phrases first, then med aliases – same string used for matching + regex */
+    private fun normaliseForMedExtraction(sentence: String): String {
+        val phraseNorm = WordVariations.normalizePhrases(sentence.lowercase())
+        return if (WordVariations.isMedicationContext(phraseNorm)) {
+            WordVariations.applyMedicationAliases(phraseNorm)
+        } else phraseNorm
+    }
+    
+    /** grab dosage/freq etc from next 1–2 sentences if not in same one */
     private fun buildMedicationFromSentences(
         medicationName: String,
         verbatimQuote: String,
         sentences: List<String>,
         sentenceIndex: Int
     ): MedicationInstruction {
-        var dosage = extractDosage(sentences[sentenceIndex].lowercase())
-        var frequency = extractFrequency(sentences[sentenceIndex].lowercase())
-        var duration = extractDuration(sentences[sentenceIndex].lowercase())
-        var specialInstructions = extractSpecialInstructions(sentences[sentenceIndex].lowercase())
+        val norm = { s: String -> normaliseForMedExtraction(s) }
+        var dosage = extractDosage(norm(sentences[sentenceIndex]))
+        var frequency = extractFrequency(norm(sentences[sentenceIndex]))
+        var duration = extractDuration(norm(sentences[sentenceIndex]))
+        var specialInstructions = extractSpecialInstructions(norm(sentences[sentenceIndex]))
         
-        // from next 2 sentences (doctor continues with "Take it with food" etc.)
         for (j in (sentenceIndex + 1)..minOf(sentenceIndex + 2, sentences.size - 1)) {
-            val next = sentences[j].lowercase()
+            val next = norm(sentences[j])
             if (dosage == null) dosage = extractDosage(next)
             if (frequency == null) frequency = extractFrequency(next)
             if (duration == null) duration = extractDuration(next)
@@ -535,7 +512,7 @@ object SchemaGuidedExtractor {
             
             if (hasLifestyle || hasReassurance) {
                 // Only add if not already captured elsewhere
-                val alreadyCaptured = MEDICATION_TRIGGERS.any { lowerSentence.contains(it) } ||
+                val alreadyCaptured = WordVariations.isMedicationContext(lowerSentence) ||
                         TEST_REFERRAL_TRIGGERS.any { lowerSentence.contains(it) } ||
                         FOLLOWUP_TRIGGERS.any { lowerSentence.contains(it) } ||
                         SAFETY_TRIGGERS.any { lowerSentence.contains(it) }
@@ -554,113 +531,83 @@ object SchemaGuidedExtractor {
     // ========================================================================
     
     private fun splitIntoSentences(text: String): List<String> {
-        // Split on sentence boundaries while preserving the content
-        return text
+        // don't split on Dr. Mr. e.g. etc
+        val abbrevPlaceholder = "§ABBREV§"
+        val protected = text.replace(
+            Regex("""\b(Dr|Mr|Mrs|Ms|Prof)\.\s+""", RegexOption.IGNORE_CASE)
+        ) { it.value.replace(". ", "$abbrevPlaceholder ") }
+            .replace(
+                Regex("""\b(e\.g\.|i\.e\.)\s+""", RegexOption.IGNORE_CASE)
+            ) { it.value.replace(". ", "$abbrevPlaceholder ") }
+        return protected
             .replace(Regex("""([.!?])\s+"""), "$1|||")
+            .replace("$abbrevPlaceholder ", ". ")
             .split("|||")
             .map { it.trim() }
             .filter { it.isNotEmpty() && it.length > 3 }
     }
     
-    /**
-     * Find medication name with fuzzy matching to handle transcription errors
-     * Handles common issues like:
-     * - Spaces inserted: "a moxosilin" -> "amoxicillin"
-     * - Misspellings: "moxosilin" -> "amoxicillin"
-     * - Case variations
-     * - Articles: "a amoxicillin" -> "amoxicillin"
-     * - Different accents/pronunciations
-     */
+    /** match med name – exact first, then fuzzy if in med context */
     private fun findMedicationName(sentence: String): String? {
         val lowerSentence = sentence.lowercase()
-        
-        // Step 1: Check exact match in COMMON_MEDICATIONS
-        val exactMatch = COMMON_MEDICATIONS.firstOrNull { 
-            lowerSentence.contains(it) 
+        val inMedContext = WordVariations.isMedicationContext(lowerSentence)
+
+        val exactMatch = COMMON_MEDICATIONS.firstOrNull {
+            lowerSentence.contains(it)
         }
         if (exactMatch != null) {
             return exactMatch.replaceFirstChar { it.uppercase() }
         }
-        
-        // Step 2: Check MedicationVariations mapping (handles known transcription errors)
-        for ((variation, correctName) in WordVariations.VARIATIONS) {
-            if (lowerSentence.contains(variation)) {
-                return correctName.replaceFirstChar { it.uppercase() }
+
+        if (inMedContext) {
+            WordVariations.findMedicationAliasIn(lowerSentence)?.let { canonical ->
+                return canonical.replaceFirstChar { it.uppercase() }
             }
         }
-        
-        // Step 3: Normalize sentence: remove common articles and extra spaces
+
         val normalized = lowerSentence
-            .replace(Regex("\\b(a|an|the)\\s+"), "") // Remove articles
-            .replace(" ", "") // Remove all spaces
-        
-        // Step 4: Check normalized variations in mapping
-        for ((variation, correctName) in WordVariations.VARIATIONS) {
-            val normalizedVariation = variation.replace(" ", "").lowercase()
-            if (normalized.contains(normalizedVariation)) {
-                return correctName.replaceFirstChar { it.uppercase() }
-            }
-        }
-        
-        // Step 5: Check normalized medications
+            .replace(Regex("\\b(a|an|the)\\s+"), "")
+            .replace(" ", "")
+
         for (medication in COMMON_MEDICATIONS) {
             val medNormalized = medication.replace(" ", "").lowercase()
-            
-            // Exact match after normalization
             if (normalized.contains(medNormalized)) {
                 return medication.replaceFirstChar { it.uppercase() }
             }
-            
-            // Fuzzy match for transcription errors (e.g., "moxosilin" -> "amoxicillin")
-            if (fuzzyMatch(medNormalized, normalized)) {
-                return medication.replaceFirstChar { it.uppercase() }
+        }
+
+        if (inMedContext) {
+            for (medication in COMMON_MEDICATIONS) {
+                val medNormalized = medication.replace(" ", "").lowercase()
+                if (fuzzyMatch(medNormalized, normalized)) {
+                    return medication.replaceFirstChar { it.uppercase() }
+                }
             }
         }
-        
+
         return null
     }
     
-    /**
-     * Simple fuzzy matching - checks if medication name appears in text
-     * with allowance for transcription errors (missing/extra characters)
-     * Handles cases like "moxosilin" -> "amoxicillin"
-     * Note: Known variations should be in MEDICATION_VARIATIONS map first
-     */
+    /** e.g. moxosilin -> amoxicillin */
     private fun fuzzyMatch(medication: String, text: String): Boolean {
-        // If medication is short, require exact match
         if (medication.length < 6) return false
-        
-        // Check if medication appears as substring
         if (text.contains(medication)) return true
-        
-        // Check similarity - if 75%+ of characters match in order, consider it a match
         val similarity = calculateSimilarity(medication, text)
         return similarity >= 0.75
     }
     
-    /**
-     * Calculate similarity between two strings (simple version)
-     * Returns value between 0.0 and 1.0
-     * Handles cases like "moxosilin" vs "amoxicillin"
-     */
     private fun calculateSimilarity(str1: String, str2: String): Double {
         if (str1.isEmpty() || str2.isEmpty()) return 0.0
-        
-        // Find longest common substring
         val longer = if (str1.length > str2.length) str1 else str2
         val shorter = if (str1.length > str2.length) str2 else str1
         
-        // Check if shorter is contained in longer
         if (longer.contains(shorter)) {
             return shorter.length.toDouble() / longer.length
         }
         
-        // Check for longest common subsequence (characters in order, not necessarily consecutive)
-        // This handles "moxosilin" vs "amoxicillin" better
         val lcsLength = longestCommonSubsequence(shorter, longer)
         val similarity = lcsLength.toDouble() / longer.length
         
-        // Also check if they start/end similarly (strong indicator)
         val startSimilar = if (shorter.length >= 3 && longer.length >= 3) {
             shorter.take(3) == longer.take(3)
         } else false

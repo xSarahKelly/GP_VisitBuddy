@@ -1,143 +1,32 @@
 package com.example.medicalappointmentcompanion.extraction
 
 /**
- * Medication Transcription Variations Map
- * 
- * Maps common transcription errors, misspellings, and pronunciation variations
- * to their correct medication spellings.
- * 
- * This handles:
- * - Different accents and pronunciations
- * - Common transcription errors (missing letters, wrong letters)
- * - Space insertions/removals
- * - Hyphen variations
- * - Articles with spaces (e.g., "a moxosilin")
+ * Fixes transcription mistakes – phrases (once aday -> once a day) and med spellings (parasetamol -> paracetamol).
+ * Med aliases only when sentence looks like med instructions.
  */
 object WordVariations {
-    
-    /**
-     * Master Map of transcription variations to correct word spellings
-     * Key: transcription variation (lowercase)
-     * Value: phrase expected by extraction regex
-     */
-    val VARIATIONS: Map<String, String> = mapOf(
 
-        // ==============================
-        // MEDICATION VARIATIONS
-        // ==============================
+    /** words that mean we're talking about meds – prescribe, take, mg, tablet, etc */
+    val MEDICATION_CONTEXT_TRIGGERS = listOf(
+        "prescribe", "prescribed", "prescribing",
+        "start you on", "starting you on", "start on",
+        "put you on", "putting you on",
+        "continue taking", "continuing taking", "keep taking",
+        "increase your", "increasing your", "reduce your", "reducing your",
+        "take", "taking",
+        "medication", "medicine",
+        "mg", "milligram", "milligrams", "mcg", "microgram",
+        "iu", "international unit",
+        "tablet", "tablets", "capsule", "capsules",
+        "inhaler", "cream", "pill", "pills"
+    )  // units help but we also catch "prescribe you X" without them
 
-        // Amoxicillin variations
-        "amoxosilin" to "amoxicillin",
-        "a moxosilin" to "amoxicillin",
-        "a moxicillin" to "amoxicillin",
-        "amoxacillin" to "amoxicillin",
-        "amoxocillin" to "amoxicillin",
-        "amoxisillin" to "amoxicillin",
-        "moxosilin" to "amoxicillin",
-        "moxocillin" to "amoxicillin",
-        "moxicillin" to "amoxicillin",
-        
-        // Pain relief variations
-        "para cetamol" to "paracetamol",
-        "paracetemol" to "paracetamol",
-        "co codamol" to "co-codamol",
-        "cocodamol" to "co-codamol",
-        "mefenamicacid" to "mefenamic acid",
-        "co dydramol" to "co-dydramol",
-        "codydramol" to "co-dydramol",
-        
-        // Antibiotic variations
-        "co amoxiclav" to "co-amoxiclav",
-        "coamoxiclav" to "co-amoxiclav",
-        "doxycyclin" to "doxycycline",
-        "clarithromicin" to "clarithromycin",
-        "azithromicin" to "azithromycin",
-        "metronidazol" to "metronidazole",
-        "penicilin" to "penicillin",
-        
-        // Stomach/acid/nausea variations
-        "omeprazol" to "omeprazole",
-        "lansoprazol" to "lansoprazole",
-        "esomeprazol" to "esomeprazole",
-        "pantoprazol" to "pantoprazole",
-        "domperidon" to "domperidone",
-        "cyclizin" to "cyclizine",
-        "prochlorperazin" to "prochlorperazine",
-        
-        // Diabetes variations
-        "metformine" to "metformin",
-        "gliclazid" to "gliclazide",
-        
-        // Blood pressure/heart variations
-        "amlodipin" to "amlodipine",
-        "furosemid" to "furosemide",
-        "bendroflumethiazid" to "bendroflumethiazide",
-        
-        // Mental health variations
-        "sertralin" to "sertraline",
-        "fluoxetin" to "fluoxetine",
-        "venlafaxin" to "venlafaxine",
-        "mirtazapin" to "mirtazapine",
-        "duloxetin" to "duloxetine",
-        "amitriptylin" to "amitriptyline",
-        
-        // Respiratory variations
-        "beclometason" to "beclometasone",
-        "prednisolon" to "prednisolone",
-        "prednison" to "prednisone",
-        
-        // Thyroid variations
-        "levothyroxin" to "levothyroxine",
-        "thyroxin" to "thyroxine",
-        
-        // Nerve pain/epilepsy variations
-        "carbamazepin" to "carbamazepine",
-        
-        // Sedatives/anxiety variations
-        "zopiclon" to "zopiclone",
-        
-        // Allergy/antihistamine variations
-        "cetirizin" to "cetirizine",
-        "loratadin" to "loratadine",
-        "fexofenadin" to "fexofenadine",
-        "chlorphenamin" to "chlorphenamine",
-        
-        // Skin condition variations
-        "hydrocortison" to "hydrocortisone",
-        "fusidicacid" to "fusidic acid",
-        "canestencream" to "canesten cream",
-        
-        // Eye/ear variations
-        "locortenvioform" to "locorten vioform",
-        "hypromellos" to "hypromellose",
-        "hylotear" to "hylo-tear",
-        "hylo tear" to "hylo-tear",
-        
-        // Gout variations
-        "colchicin" to "colchicine",
-        
-        // Men's health/prostate variations
-        "finasterid" to "finasteride",
-        "dutasterid" to "dutasteride",
-        
-        // Women's health variations
-        "coppercoil" to "copper coil",
-        "norethisteron" to "norethisterone",
-        "tranexamicacid" to "tranexamic acid",
-        "clomiphen" to "clomiphene",
-        "fluconazol" to "fluconazole",
-        
-        // Supplement variations
-        "folicacid" to "folic acid",
-        "vitamind" to "vitamin d",
-        "ferrousfumarate" to "ferrous fumarate",
-        "ferroussulfate" to "ferrous sulfate",
+    fun isMedicationContext(sentence: String): Boolean {
+        val lower = sentence.lowercase()
+        return MEDICATION_CONTEXT_TRIGGERS.any { lower.contains(it) }
+    }
 
-
-        // ==============================
-        // FREQUENCY VARIATIONS
-        // ==============================
-
+    private val PHRASE_NORMALISATION: Map<String, String> = mapOf(
         // Once / daily
         "once aday" to "once a day",
         "once per day" to "once a day",
@@ -193,17 +82,23 @@ object WordVariations {
         "as kneaded" to "as needed",
         "as need it" to "as needed",
         "when you need it" to "when needed",
+        "when kneaded" to "when needed",
 
-
-        // ==============================
-        // DURATION VARIATIONS
-        // ==============================
-
-        // Weeks / months
+        // word form -> digit so duration regex works
         "for a weak" to "for a week",
         "for 1 week" to "for a week",
         "for two weeks" to "for 2 weeks",
         "for three weeks" to "for 3 weeks",
+        "for four weeks" to "for 4 weeks",
+        "for five weeks" to "for 5 weeks",
+        "for six weeks" to "for 6 weeks",
+        "for seven days" to "for 7 days",
+        "for five days" to "for 5 days",
+        "for six days" to "for 6 days",
+        "for ten days" to "for 10 days",
+        "in one week" to "in 1 week",
+        "in two weeks" to "in 2 weeks",
+        "in four weeks" to "in 4 weeks",
         "for three months" to "for 3 months",
         "for six months" to "for 6 months",
 
@@ -220,22 +115,195 @@ object WordVariations {
         "in definitely" to "indefinitely",
         "indefinately" to "indefinitely",
         "perminently" to "permanently"
+    )
 
-        )
-    /**
-     * Safe normalization using word boundaries.
-     * Prevents replacing substrings inside other words.
-     */
-    fun normalize(text: String): String {
+    fun normalizePhrases(text: String): String {
         var normalized = text.lowercase()
-
-        VARIATIONS.forEach { (variant, canonical) ->
+        PHRASE_NORMALISATION.forEach { (variant, canonical) ->
             val pattern = Regex("\\b${Regex.escape(variant)}\\b")
             normalized = normalized.replace(pattern, canonical)
         }
-
         return normalized
     }
+
+
+    private val MEDICATION_ALIASES: Map<String, String> = mapOf(
+        // Amoxicillin
+        "amoxosilin" to "amoxicillin",
+        "amoxisilin" to "amoxicillin",
+        "amoxcillin" to "amoxicillin",
+        "a moxosilin" to "amoxicillin",
+        "a moxicillin" to "amoxicillin",
+        "a moxisillin" to "amoxicillin",
+        "a moxasillin" to "amoxicillin",
+        "a moxacillin" to "amoxicillin",
+        "a moxisilin" to "amoxicillin",
+        "a maxasillin" to "amoxicillin",
+        "a maxisillin" to "amoxicillin",
+        "a moxocillin" to "amoxicillin",
+        "a marxicillin" to "amoxicillin",
+        "a marxacillin" to "amoxicillin",
+        "amoxacillin" to "amoxicillin",
+        "amoxocillin" to "amoxicillin",
+        "amoxisillin" to "amoxicillin",
+        "moxosilin" to "amoxicillin",
+        "moxocillin" to "amoxicillin",
+        "moxicillin" to "amoxicillin",
+
+        // Pain relief
+        "para cetamol" to "paracetamol",
+        "paracetemol" to "paracetamol",
+        "paracetimol" to "paracetamol",
+        "piracy's small" to "paracetamol",
+        "parasetamol" to "paracetamol",
+        "parcetamol" to "paracetamol",
+        "parsacetamol" to "paracetamol",
+        "para setamol" to "paracetamol",
+        "co codamol" to "co-codamol",
+        "cocodamol" to "co-codamol",
+        "mefenamicacid" to "mefenamic acid",
+        "co dydramol" to "co-dydramol",
+        "codydramol" to "co-dydramol",
+        "sol padol" to "solpadol",
+        "solpadole" to "solpadol",
+        "ibruprofen" to "ibuprofen",
+        "ibuprofene" to "ibuprofen",
+
+        // Antibiotics
+        "co amoxiclav" to "co-amoxiclav",
+        "coamoxiclav" to "co-amoxiclav",
+        "doxycyclin" to "doxycycline",
+        "clarithromicin" to "clarithromycin",
+        "azithromicin" to "azithromycin",
+        "metronidazol" to "metronidazole",
+        "penicilin" to "penicillin",
+        "augmentine" to "augmentin",
+        "flucloxacilin" to "flucloxacillin",
+
+        // Stomach/acid/nausea
+        "omeprazol" to "omeprazole",
+        "lansoprazol" to "lansoprazole",
+        "esomeprazol" to "esomeprazole",
+        "pantoprazol" to "pantoprazole",
+        "domperidon" to "domperidone",
+        "cyclizin" to "cyclizine",
+        "prochlorperazin" to "prochlorperazine",
+        "omeperazole" to "omeprazole",
+        "omperazole" to "omeprazole",
+        "ventoline" to "ventolin",
+        "ventolen" to "ventolin",
+
+        // Diabetes
+        "metformine" to "metformin",
+        "gliclazid" to "gliclazide",
+
+        // Blood pressure/heart
+        "amlodipin" to "amlodipine",
+        "a melodopine" to "amlodipine",
+        "furosemid" to "furosemide",
+        "bendroflumethiazid" to "bendroflumethiazide",
+        "lisinopryl" to "lisinopril",
+        "lysinopril" to "lisinopril",
+        "ramapril" to "ramipril",
+        "ramepril" to "ramipril",
+        "atorvastatine" to "atorvastatin",
+        "simvastatine" to "simvastatin",
+
+        // Mental health
+        "sertralin" to "sertraline",
+        "fluoxetin" to "fluoxetine",
+        "venlafaxin" to "venlafaxine",
+        "mirtazapin" to "mirtazapine",
+        "duloxetin" to "duloxetine",
+        "amitriptylin" to "amitriptyline",
+        "escitralopram" to "escitalopram",
+        "citalapram" to "citalopram",
+
+        // Respiratory
+        "beclometason" to "beclometasone",
+        "prednisolon" to "prednisolone",
+        "prednison" to "prednisone",
+        "salbutamole" to "salbutamol",
+        "seritide" to "seretide",
+
+        // Thyroid
+        "levothyroxin" to "levothyroxine",
+        "thyroxin" to "thyroxine",
+        "levothyroxen" to "levothyroxine",
+
+        // Nerve pain/epilepsy
+        "carbamazepin" to "carbamazepine",
+        "gabapentine" to "gabapentin",
+        "pregabaline" to "pregabalin",
+
+        // Sedatives/anxiety
+        "zopiclon" to "zopiclone",
+
+        // Allergy/antihistamine
+        "cetirizin" to "cetirizine",
+        "loratadin" to "loratadine",
+        "fexofenadin" to "fexofenadine",
+        "chlorphenamin" to "chlorphenamine",
+
+        // Skin
+        "hydrocortison" to "hydrocortisone",
+        "hydrocortizone" to "hydrocortisone",
+        "fusidicacid" to "fusidic acid",
+        "canestencream" to "canesten cream",
+
+        // Eye/ear
+        "locortenvioform" to "locorten vioform",
+        "hypromellos" to "hypromellose",
+        "hylotear" to "hylo-tear",
+        "hylo tear" to "hylo-tear",
+
+        // Gout
+        "colchicin" to "colchicine",
+
+        // Men's health/prostate
+        "finasterid" to "finasteride",
+        "dutasterid" to "dutasteride",
+
+        // Women's health
+        "micro gynon" to "microgynon",
+        "microgynen" to "microgynon",
+        "coppercoil" to "copper coil",
+        "norethisteron" to "norethisterone",
+        "proveria" to "provera",
+        "tranexamicacid" to "tranexamic acid",
+        "clomiphen" to "clomiphene",
+        "fluconazol" to "fluconazole",
+
+        // Supplements
+        "folicacid" to "folic acid",
+        "vitamind" to "vitamin d",
+        "ferrousfumarate" to "ferrous fumarate",
+        "ferroussulfate" to "ferrous sulfate"
+    )
+
+    /** parasetamol -> paracetamol etc. Same string used for matching + regex. */
+    fun applyMedicationAliases(text: String): String {
+        var result = text.lowercase()
+        // longer matches first
+        MEDICATION_ALIASES.entries
+            .sortedByDescending { it.key.length }
+            .forEach { (variant, canonical) ->
+                val pattern = Regex("\\b${Regex.escape(variant)}\\b")
+                result = result.replace(pattern, canonical)
+            }
+        return result
+    }
+
+    fun findMedicationAliasIn(text: String): String? {
+        val lower = text.lowercase()
+        for ((variant, canonical) in MEDICATION_ALIASES) {
+            if (lower.contains(variant)) return canonical
+        }
+        val normalized = lower.replace(Regex("\\b(a|an|the)\\s+"), "").replace(" ", "")
+        for ((variant, canonical) in MEDICATION_ALIASES) {
+            val normVariant = variant.replace(" ", "").lowercase()
+            if (normalized.contains(normVariant)) return canonical
+        }
+        return null
+    }
 }
-
-
