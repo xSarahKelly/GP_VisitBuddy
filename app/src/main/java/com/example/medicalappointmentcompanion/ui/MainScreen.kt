@@ -710,7 +710,8 @@ private fun SummaryScreen(
                         title = "Follow-Up"
                     ) {
                         BulletPoint(
-                            text = buildString {
+                            text = followUp.verbatimQuote?.takeIf { it.isNotBlank() }
+                                ?:buildString {
                                 append("Return")
                                 followUp.timeframe?.let { append(" $it") }
                                 followUp.locationOrMethod?.let { append(" ($it)") }
