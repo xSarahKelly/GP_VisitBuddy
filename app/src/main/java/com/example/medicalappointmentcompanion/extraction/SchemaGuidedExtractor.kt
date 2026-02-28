@@ -9,7 +9,7 @@ import com.example.medicalappointmentcompanion.model.*
  */
 object SchemaGuidedExtractor {
     
-    // meds we recognise (Ireland GP stuff)
+    // meds
     private val COMMON_MEDICATIONS = listOf(
         // Pain relief
         "paracetamol", "ibuprofen", "aspirin", "codeine", "tramadol",
@@ -86,7 +86,7 @@ object SchemaGuidedExtractor {
         
         // Women's health
         "microgynon", "cilest", "yasmin", "dianette", "cerazette", "noriday",
-        "mirena", "kyleena", "jaydess", "copper coil",
+        "mirena", "kyleena", "jaydess", "copper coil", "Yazmin", "Naproxen", "Provera",
         "norethisterone", "provera", "tranexamic acid",
         "evorel", "estradot", "elleste", "femoston", "kliovance", "oestrogel",
         "vagifem", "ovestin",
@@ -94,8 +94,15 @@ object SchemaGuidedExtractor {
         "fluconazole", "canesten",
         
         // Supplements 
-        "folic acid", "vitamin d", "desunin", "iron", "ferrous fumarate",
+        "folic acid", "vitamin D", "desunin", "iron", "ferrous fumarate",
         "ferrous sulfate", "calcichew", "adcal"
+    )
+
+    // Vitamins/supplements – don't pull dosage from following sentences (avoids 500mg from next med)
+    private val VITAMINS_SUPPLEMENTS = setOf(
+        "vitamin D", "vitamin C", "vitamin B", "vitamin B12", "vitamin B6",
+        "folic acid", "iron", "ferrous fumarate", "ferrous sulfate",
+        "calcichew", "adcal", "desunin"
     )
     
     // Frequency patterns 
@@ -116,9 +123,18 @@ object SchemaGuidedExtractor {
     // Duration patterns  
     private val DURATION_PATTERNS = listOf(
         "for \\d+ days?", "for \\d+ weeks?", "for \\d+ months?",
+        "for next \\d+ days?", "for the next \\d+ days?",
+        "for next (one|two|three|four|five|six|seven) days?",
+        "for the next (one|two|three|four|five|six|seven) days?",
+        "only for next \\d+ days?", "only for the next \\d+ days?",
+        "only for next (one|two|three|four|five|six|seven) days?",
+        "only for the next (one|two|three|four|five|six|seven) days?",
         "for a week", "for two weeks", "for a month",
         "until finished", "until gone", "until the course is complete",
         "until you feel better", "until symptoms improve",
+        "(?:don't|dont|do not) take it longer than that",
+        "(?:don't|dont|do not) take .+ longer than that",
+        "(?:don't|dont|do not) take .+ longer than \\d+ days?",
         "long term", "ongoing", "indefinitely", "permanently"
     )
     
@@ -126,12 +142,14 @@ object SchemaGuidedExtractor {
     private val TEST_REFERRAL_TRIGGERS = listOf(
         "blood test", "blood tests", "bloods",
         "swabs", "swab",
-        "x-ray", "xray", "scan", "ct scan", "mri", "ultrasound",
+        "ultrasound scan", "ct scan", "mri scan", "x-ray scan",
+        "x-ray", "xray", "scan", "mri", "ultrasound",
         "ecg", "ekg", "echocardiogram",
         "urine test", "urine sample", "stool sample",
         "biopsy", "endoscopy", "colonoscopy",
-        "refer", "referral", "referring", "specialist",
-        "hospital", "clinic", "consultant"
+        "referral", "referring", "refer", "specialist",
+        "hospital", "consultant",
+        "vasectomy", "gynaecology", "gynecology"
     )
     
     // Urgency indicators
@@ -144,16 +162,16 @@ object SchemaGuidedExtractor {
     
     // Follow-up triggers
     private val FOLLOWUP_TRIGGERS = listOf(
-        "come back", "see you", "follow up", "follow-up", "followup",
-        "book", "appointment", "review",
-        "check", "check-up", "checkup",
-        "return", "revisit"
+        "come back", "come back to", "return", "revisit", "see you"
     )
     
     // Timeframe patterns
     private val TIMEFRAME_PATTERNS = listOf(
         "in \\d+ days?", "in \\d+ weeks?", "in \\d+ months?",
-        "in a week", "in two weeks", "in a month", "in a fortnight",
+        "in a week", "in two weeks", "in three weeks", "in four weeks",
+        "in five weeks", "in six weeks", "in a month", "in two months",
+        "in three months", "in four months", "in six months", "in a fortnight",
+        "in a couple of weeks", "in a few days", "in a couple of days",
         "next week", "next month",
         "after \\d+ days?", "after \\d+ weeks?"
     )
@@ -178,6 +196,17 @@ object SchemaGuidedExtractor {
         "vomiting", "diarrhoea", "diarrhea",
         "confused", "confusion", "drowsy"
     )
+
+    // Safety verbs – "if you develop/get X"
+    private val SAFETY_VERBS = listOf(
+        "develop", "get", "experience", "have", "notice", "see"
+    )
+
+    // Reason phrases for tests – "blood test to check X"
+    private val TEST_REASON_PHRASES = listOf(
+        "to check", "to assess", "to monitor", "to see", "to look at",
+        "for", "because of", "to rule out"
+    )
     
     // ========================================================================
     // MAIN EXTRACTION FUNCTION
@@ -194,8 +223,9 @@ object SchemaGuidedExtractor {
         transcript: String,
         recordingDurationSeconds: Int? = null
     ): MedicalExtraction {
-        val lowerTranscript = transcript.lowercase()
-        val sentences = splitIntoSentences(transcript)
+        val normalizedTranscript = WordVariations.normalizePhrases(transcript.lowercase())
+        val sentences = splitIntoSentences(normalizedTranscript)
+        val lowerTranscript = normalizedTranscript
         
         return MedicalExtraction(
             appointmentMetadata = AppointmentMetadata(
@@ -288,17 +318,22 @@ object SchemaGuidedExtractor {
         sentenceIndex: Int
     ): MedicationInstruction {
         val norm = { s: String -> normaliseForMedExtraction(s) }
+        val isVitaminOrSupplement = VITAMINS_SUPPLEMENTS.any { 
+            medicationName.equals(it, ignoreCase = true) 
+        }
         var dosage = extractDosage(norm(sentences[sentenceIndex]))
         var frequency = extractFrequency(norm(sentences[sentenceIndex]))
         var duration = extractDuration(norm(sentences[sentenceIndex]))
         var specialInstructions = extractSpecialInstructions(norm(sentences[sentenceIndex]))
         
-        for (j in (sentenceIndex + 1)..minOf(sentenceIndex + 2, sentences.size - 1)) {
-            val next = norm(sentences[j])
-            if (dosage == null) dosage = extractDosage(next)
-            if (frequency == null) frequency = extractFrequency(next)
-            if (duration == null) duration = extractDuration(next)
-            if (specialInstructions == null) specialInstructions = extractSpecialInstructions(next)
+        if (!isVitaminOrSupplement) {
+            for (j in (sentenceIndex + 1)..minOf(sentenceIndex + 2, sentences.size - 1)) {
+                val next = norm(sentences[j])
+                if (dosage == null) dosage = extractDosage(next)
+                if (frequency == null) frequency = extractFrequency(next)
+                if (duration == null) duration = extractDuration(next)
+                if (specialInstructions == null) specialInstructions = extractSpecialInstructions(next)
+            }
         }
         
         return MedicationInstruction(
@@ -367,29 +402,101 @@ object SchemaGuidedExtractor {
         for (sentence in sentences) {
             val lowerSentence = sentence.lowercase()
             
-            // Find test/referral type
             val testType = TEST_REFERRAL_TRIGGERS.firstOrNull { 
+                lowerSentence.contains(it) 
+            } ?: continue
+            
+            if (listOf("hospital", "consultant", "specialist").contains(testType) &&
+                (lowerSentence.contains("referral to") || lowerSentence.contains("refer to") || 
+                 lowerSentence.contains("referring to") || lowerSentence.startsWith("to the ") || lowerSentence.startsWith("to "))) {
+                continue
+            }
+            
+            val urgency = URGENCY_INDICATORS.firstOrNull { 
                 lowerSentence.contains(it) 
             }
             
-            if (testType != null) {
-                // Check for urgency - ONLY if explicitly stated
-                val urgency = URGENCY_INDICATORS.firstOrNull { 
-                    lowerSentence.contains(it) 
-                }
-                
-                testsAndReferrals.add(
-                    TestOrReferral(
-                        testOrReferralType = testType.replaceFirstChar { it.uppercase() },
-                        reasonIfStated = null, // Only extract if explicitly stated with "because", "for", etc.
-                        urgency = urgency,
-                        verbatimQuote = sentence.trim()
-                    )
-                )
+            val reason = extractTestReason(lowerSentence, testType)
+            var destination = extractReferralDestination(lowerSentence, testType)
+            if (destination == null && listOf("vasectomy", "gynaecology", "gynecology").contains(testType)) {
+                destination = extractSpecialtyDestination(lowerSentence, testType)
             }
+            var displayType = when {
+                testType == "refer" && destination != null -> "Referral"
+                listOf("vasectomy", "gynaecology", "gynecology").contains(testType) -> "Referral"
+                testType == "scan" -> extractScanType(lowerSentence) ?: "Scan"
+                else -> testType.replaceFirstChar { it.uppercase() }
+            }
+            
+            testsAndReferrals.add(
+                TestOrReferral(
+                    testOrReferralType = displayType,
+                    reasonIfStated = reason,
+                    destinationIfStated = destination,
+                    urgency = urgency,
+                    verbatimQuote = sentence.trim()
+                )
+            )
         }
         
-        return testsAndReferrals.distinctBy { it.testOrReferralType.lowercase() }
+        return testsAndReferrals.distinctBy { 
+            "${it.testOrReferralType.lowercase()}-${it.destinationIfStated?.lowercase() ?: ""}-${it.reasonIfStated?.lowercase() ?: ""}" 
+        }
+    }
+    
+    private fun extractScanType(sentence: String): String? {
+        val scanTypeRegex = Regex(
+            """(\w+(?:-\w+)?)\s+scan""",
+            RegexOption.IGNORE_CASE
+        )
+        return scanTypeRegex.find(sentence)?.groupValues?.getOrNull(1)?.let { type ->
+            "${type.replaceFirstChar { it.uppercase() }} scan"
+        }
+    }
+    
+    private fun extractTestReason(sentence: String, testType: String): String? {
+        val phraseRegex = Regex(
+            """(?:${TEST_REASON_PHRASES.joinToString("|") { Regex.escape(it) }})\s+(.+?)(?:\.|$|,)""",
+            RegexOption.IGNORE_CASE
+        )
+        phraseRegex.find(sentence)?.groupValues?.getOrNull(1)?.let { captured ->
+            val trimmed = captured.trim()
+            if (trimmed.length in 3..150) return trimmed
+        }
+        val forRegex = Regex(
+            """(?:blood test|bloods|test|scan|x-ray|swab|referral)\s+for\s+(.+?)(?:\.|$|,)""",
+            RegexOption.IGNORE_CASE
+        )
+        forRegex.find(sentence)?.groupValues?.getOrNull(1)?.let { captured ->
+            val trimmed = captured.trim()
+            if (trimmed.length in 3..150) return trimmed
+        }
+        return null
+    }
+    
+    private fun extractReferralDestination(sentence: String, testType: String): String? {
+        if (!sentence.contains("refer") && !sentence.contains("referral") && !sentence.contains("referring")) return null
+        val toRegex = Regex(
+            """(?:referral|referring|refer)\s+(?:you)?\s*to\s+(.+?)(?:\.|$|,| for| and)""",
+            RegexOption.IGNORE_CASE
+        )
+        toRegex.find(sentence)?.groupValues?.getOrNull(1)?.let { captured ->
+            val trimmed = captured.trim()
+            if (trimmed.length in 2..80) return trimmed.replaceFirstChar { it.uppercase() }
+        }
+        return null
+    }
+    
+    private fun extractSpecialtyDestination(sentence: String, testType: String): String? {
+        val pattern = Regex(
+            """(${Regex.escape(testType)}\s+(?:clinic|department|unit|service|team))""",
+            RegexOption.IGNORE_CASE
+        )
+        pattern.find(sentence)?.groupValues?.getOrNull(1)?.let { captured ->
+            val trimmed = captured.trim()
+            if (trimmed.length in 3..80) return trimmed.replaceFirstChar { it.uppercase() }
+        }
+        return testType.replaceFirstChar { it.uppercase() }
     }
     
     // ========================================================================
@@ -410,10 +517,14 @@ object SchemaGuidedExtractor {
             var timeframe: String? = null
             for (pattern in TIMEFRAME_PATTERNS) {
                 val regex = Regex(pattern, RegexOption.IGNORE_CASE)
-                regex.find(lowerSentence)?.let { 
+                regex.find(lowerSentence)?.let {
                     timeframe = it.value
                 }
             }
+            
+            val hasTimeframe = timeframe != null
+            val hasConditionalReturn = lowerSentence.contains(" if ")
+            if (!hasTimeframe && !hasConditionalReturn) continue
             
             // Extract location/method if stated
             val locationMethod = when {
@@ -448,12 +559,11 @@ object SchemaGuidedExtractor {
         for (sentence in sentences) {
             val lowerSentence = sentence.lowercase()
             
-            // Check for safety trigger phrases
             val hasSafetyTrigger = SAFETY_TRIGGERS.any { lowerSentence.contains(it) }
             val hasSafetyCondition = SAFETY_CONDITIONS.any { lowerSentence.contains(it) }
+            val hasSafetyVerb = SAFETY_VERBS.any { lowerSentence.contains(it) }
             
-            // Must have both a trigger and a condition for high confidence
-            if (hasSafetyTrigger && hasSafetyCondition) {
+            if (hasSafetyTrigger && (hasSafetyCondition || hasSafetyVerb)) {
                 warnings.add(
                     SafetyWarning(
                         warning = sentence.trim(),
@@ -461,7 +571,6 @@ object SchemaGuidedExtractor {
                     )
                 )
             }
-            // Or strong emergency triggers alone
             else if (lowerSentence.contains("a&e") || 
                      lowerSentence.contains("999") ||
                      lowerSentence.contains("emergency") ||

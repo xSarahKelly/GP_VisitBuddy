@@ -42,7 +42,9 @@ object WordVariations {
 
         // Three times
         "3 times a day" to "three times a day",
+        "tree times a day" to "three times a day",
         "three times aday" to "three times a day",
+        "tree times a day" to "three times a day",
 
         // Four times
         "4 times a day" to "four times a day",
@@ -108,6 +110,21 @@ object WordVariations {
         "until the course is completed" to "until the course is complete",
         "until symptoms get better" to "until symptoms improve",
 
+        // A&E
+        "go to any" to "go to A&E",
+        "attend any" to "attend A&E",
+
+        // X-ray
+
+
+        // Referral specialties
+        "gynocology" to "gynaecology",
+        "gynacology" to "gynaecology",
+        "vasectomoy" to "vasectomy",
+        "vasectimy" to "vasectomy",
+        "vasecty" to "vasectomy",
+        "utrasound" to "ultrasound",
+
         // Long term
         "longturn" to "long term",
         "long-term" to "long term",
@@ -162,11 +179,16 @@ object WordVariations {
         "co codamol" to "co-codamol",
         "cocodamol" to "co-codamol",
         "mefenamicacid" to "mefenamic acid",
+        "metphonomic acid" to "mefenamic acid",
+        "metphanomic acid" to "mefenamic acid",
+        "mefenamicacid" to "mefenamic acid",
         "co dydramol" to "co-dydramol",
         "codydramol" to "co-dydramol",
         "sol padol" to "solpadol",
         "solpadole" to "solpadol",
         "ibruprofen" to "ibuprofen",
+        "ibrofen" to "ibuprofen",
+        "ib prophi[n" to "ibuprofen",
         "ibuprofene" to "ibuprofen",
 
         // Antibiotics
@@ -182,6 +204,8 @@ object WordVariations {
 
         // Stomach/acid/nausea
         "omeprazol" to "omeprazole",
+        "ameprazol" to "omeprazole",
+        "ameprazole" to "omeprazole",
         "lansoprazol" to "lansoprazole",
         "esomeprazol" to "esomeprazole",
         "pantoprazol" to "pantoprazole",
@@ -206,11 +230,13 @@ object WordVariations {
         "lysinopril" to "lisinopril",
         "ramapril" to "ramipril",
         "ramepril" to "ramipril",
+        "ramapro" to "ramipril",
         "atorvastatine" to "atorvastatin",
         "simvastatine" to "simvastatin",
 
         // Mental health
         "sertralin" to "sertraline",
+        "search routine" to "sertraline",
         "fluoxetin" to "fluoxetine",
         "venlafaxin" to "venlafaxine",
         "mirtazapin" to "mirtazapine",
@@ -269,14 +295,25 @@ object WordVariations {
         "microgynen" to "microgynon",
         "coppercoil" to "copper coil",
         "norethisteron" to "norethisterone",
+        "neurothistorone" to "norethisterone",
+        "norhists to roam" to "norethisterone",
         "proveria" to "provera",
         "tranexamicacid" to "tranexamic acid",
         "clomiphen" to "clomiphene",
         "fluconazol" to "fluconazole",
+        "fluconasol" to "fluconazole",
+        "flu conazol" to "fluconazole",
+        "flu canasol" to "fluconazole",
+        "flu condosol" to "fluconazole",
+        "Yasmin" to "Yazmin",
+        "naproxin" to "Naproxen",
+        "Pervira" to "Provera",
+        "Provira" to "Provera",
+        "Provirah" to "Provera",
 
         // Supplements
         "folicacid" to "folic acid",
-        "vitamind" to "vitamin d",
+        "vitamind" to "vitamin D",
         "ferrousfumarate" to "ferrous fumarate",
         "ferroussulfate" to "ferrous sulfate"
     )
