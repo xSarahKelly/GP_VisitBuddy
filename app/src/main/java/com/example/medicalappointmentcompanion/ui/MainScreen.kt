@@ -36,6 +36,12 @@ import androidx.core.content.ContextCompat
 import com.example.medicalappointmentcompanion.model.Appointment
 import com.example.medicalappointmentcompanion.model.AppointmentStatus
 import com.example.medicalappointmentcompanion.model.AppState
+import com.example.medicalappointmentcompanion.model.FollowUpInstruction
+import com.example.medicalappointmentcompanion.model.MedicalExtraction
+import com.example.medicalappointmentcompanion.model.MedicationInstruction
+import com.example.medicalappointmentcompanion.model.SafetyWarning
+import com.example.medicalappointmentcompanion.model.TestOrReferral
+import com.example.medicalappointmentcompanion.model.Transcription
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -51,7 +57,7 @@ private val PrimaryBlueLight = Color(0xFFE3F2FD)
 // Accent colors for actions
 private val AccentRed = Color(0xFFE53935)       // Stop/Delete actions
 private val AccentGreen = Color(0xFF43A047)     // Success/Save
-private val AccentAmber = Color(0xFFFFA000)     // Warnings
+private val AccentAmber = Color(0xFFF44336)     // Warnings
 
 // Backgrounds - light and accessible
 private val BackgroundWhite = Color(0xFFFAFAFA)
@@ -77,7 +83,8 @@ fun MainScreen(
     onSelectAppointment: (String) -> Unit,
     onDeleteAppointment: (String) -> Unit,
     onClearAppointment: () -> Unit,
-    onClearError: () -> Unit
+    onClearError: () -> Unit,
+    onUpdateAppointment: (Appointment) -> Unit,
 ) {
     val context = LocalContext.current
     var hasPermission by remember {
@@ -96,7 +103,9 @@ fun MainScreen(
     var showPastSummaries by remember { mutableStateOf(false) }
     var showSettingsDialog by remember { mutableStateOf(false) }
     var showModelDialog by remember { mutableStateOf(false) }
-    
+    var showConsentDialog by remember { mutableStateOf(false) }
+    var showReviewScreen by remember { mutableStateOf(false) }
+
     LaunchedEffect(Unit) {
         if (!hasPermission) {
             permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
@@ -130,13 +139,27 @@ fun MainScreen(
             state.isTranscribing -> {
                 ProcessingScreen()
             }
-            
+
+            // Review screen (editing appointment)
+            showReviewScreen && state.currentAppointment != null -> {
+                ReviewScreen(
+                    appointment = state.currentAppointment!!,
+                    onSave = { updated ->
+                        onUpdateAppointment(updated.copy(isLocked = true))
+                        showReviewScreen = false
+                    },
+                    onBack = { showReviewScreen = false }
+                )
+            }
+
             // Viewing appointment detail
             state.currentAppointment != null -> {
                 SummaryScreen(
                     appointment = state.currentAppointment,
                     onBack = onClearAppointment,
-                    onDelete = { onDeleteAppointment(state.currentAppointment.id) }
+                    onDelete = { onDeleteAppointment(state.currentAppointment.id) },
+                    onReview = { showReviewScreen = true }
+
                 )
             }
             
@@ -161,7 +184,8 @@ fun MainScreen(
                     onViewPastSummaries = { showPastSummaries = true },
                     onRequestPermission = { permissionLauncher.launch(Manifest.permission.RECORD_AUDIO) },
                     onOpenSettings = { showSettingsDialog = true },
-                    onLoadModel = { showModelDialog = true }
+                    onLoadModel = { showModelDialog = true },
+                    onShowConsent = { showConsentDialog = true }
                 )
             }
         }
@@ -215,6 +239,36 @@ fun MainScreen(
             }
         )
     }
+    // Consent dialog
+    if (showConsentDialog) {
+        AlertDialog(
+            onDismissRequest = { showConsentDialog = false },
+            title = { Text("GP Consent", color = TextPrimary) },
+            text = {
+                Text(
+                    "I confirm that I consent to the recording of this consultation.",
+                    color = TextSecondary
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showConsentDialog = false
+                        onStartRecording()
+                    }
+                ) {
+                    Text("I Confirm", color = PrimaryBlue)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showConsentDialog = false }) {
+                    Text("Cancel", color = TextSecondary)
+                }
+            },
+            containerColor = SurfaceWhite
+        )
+    }
+
 }
 
 // ============================================================================
@@ -232,7 +286,8 @@ private fun HomeScreen(
     onViewPastSummaries: () -> Unit,
     onRequestPermission: () -> Unit,
     onOpenSettings: () -> Unit,
-    onLoadModel: () -> Unit
+    onLoadModel: () -> Unit,
+    onShowConsent: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -266,13 +321,13 @@ private fun HomeScreen(
         
         // Start Recording Button (Primary action) - LARGE tap target
         val canRecord = isModelLoaded && hasPermission
-        
+
         Button(
             onClick = {
                 when {
                     !isModelLoaded -> onLoadModel()
                     !hasPermission -> onRequestPermission()
-                    else -> onStartRecording()
+                    else -> onShowConsent()
                 }
             },
             modifier = Modifier
@@ -280,6 +335,7 @@ private fun HomeScreen(
                 .height(72.dp),
             colors = ButtonDefaults.buttonColors(
                 containerColor = PrimaryBlue
+
             ),
             shape = RoundedCornerShape(16.dp),
             enabled = !isModelLoading && !isModelDownloading
@@ -294,7 +350,8 @@ private fun HomeScreen(
                 Text(
                     text = "🎤  Start Recording",
                     fontSize = 22.sp,
-                    fontWeight = FontWeight.SemiBold
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color.White
                 )
             }
         }
@@ -576,7 +633,8 @@ private fun ProcessingScreen() {
 private fun SummaryScreen(
     appointment: Appointment,
     onBack: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onReview: () -> Unit
 ) {
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showShareDialog by remember { mutableStateOf(false) }
@@ -673,7 +731,7 @@ private fun SummaryScreen(
                 if (extraction.safetyAdvice.isNotEmpty()) {
                     SummarySection(
                         emoji = "⚠️",
-                        title = "Red Flags"
+                        title = "Safety Warnings"
                     ) {
                         extraction.safetyAdvice.forEach { warning ->
                             BulletPoint(
@@ -695,6 +753,8 @@ private fun SummaryScreen(
                             BulletPoint(
                                 text = buildString {
                                     append(test.testOrReferralType)
+                                    test.destinationIfStated?.let { append(" to $it") }
+                                    test.reasonIfStated?.let { append(" – $it") }
                                     test.urgency?.let { append(" ($it)") }
                                 }
                             )
@@ -760,7 +820,24 @@ private fun SummaryScreen(
                 .fillMaxWidth()
                 .padding(20.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp)
+
+
         ) {
+            // Review & Edit button (if not locked)
+            if (!appointment.isLocked) {
+                Button(
+                    onClick = onReview,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue),
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    Text("✏️  GP Review & Edit", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+            }
+
             // Save button
             Button(
                 onClick = { /* Already saved automatically */ },
@@ -824,6 +901,283 @@ private fun SummaryScreen(
     }
 }
 
+@Composable
+private fun ReviewScreen(
+    appointment: Appointment,
+    onSave: (Appointment) -> Unit,
+    onBack: () -> Unit
+) {
+    var transcriptText by remember(appointment.id) {
+        mutableStateOf(appointment.transcription?.fullText ?: "")
+    }
+    var medLines by remember(appointment.id) {
+        mutableStateOf(
+            appointment.extraction?.medicationInstructions?.map { med ->
+                buildString {
+                    append(med.medicineName)
+                    med.dosage?.let { append(" $it") }
+                    med.frequency?.let { append(" $it") }
+                    med.duration?.let { append(", $it") }
+                    med.specialInstructions?.let { append(" ($it)") }
+                }
+            } ?: mutableListOf("")
+        )
+    }
+    var safetyLines by remember(appointment.id) {
+        mutableStateOf(
+            appointment.extraction?.safetyAdvice?.map { it.warning }?.toMutableList()
+                ?: mutableListOf("")
+        )
+    }
+    var testLines by remember(appointment.id) {
+        mutableStateOf(
+            appointment.extraction?.testsAndReferrals?.map { t ->
+                buildString {
+                    append(t.testOrReferralType)
+                    t.destinationIfStated?.let { append(" to $it") }
+                    t.reasonIfStated?.let { append(" – $it") }
+                    t.urgency?.let { append(" ($it)") }
+                }
+            }?.toMutableList() ?: mutableListOf("")
+        )
+    }
+    var followUpText by remember(appointment.id) {
+        mutableStateOf(
+            appointment.extraction?.followUp?.verbatimQuote
+                ?: appointment.extraction?.followUp?.let { f ->
+                    buildString {
+                        f.timeframe?.let { append(it) }
+                        f.locationOrMethod?.let { append(" ($it)") }
+                    }.takeIf { it.isNotBlank() } ?: ""
+                } ?: ""
+        )
+    }
+    var notesLines by remember(appointment.id) {
+        mutableStateOf(
+            appointment.extraction?.additionalNotes?.toMutableList()
+                ?: mutableListOf("")
+        )
+    }
+
+    fun buildExtraction(): MedicalExtraction {
+        val meds = medLines.filter { it.isNotBlank() }.map { line ->
+            MedicationInstruction(medicineName = line.trim())
+        }
+        val safety = safetyLines.filter { it.isNotBlank() }.map { line ->
+            SafetyWarning(warning = line.trim())
+        }
+        val tests = testLines.filter { it.isNotBlank() }.map { line ->
+            TestOrReferral(testOrReferralType = line.trim())
+        }
+        val followUp = followUpText.takeIf { it.isNotBlank() }?.let {
+            FollowUpInstruction(verbatimQuote = it.trim())
+        }
+        val notes = notesLines.filter { it.isNotBlank() }
+        return (appointment.extraction ?: MedicalExtraction()).copy(
+            medicationInstructions = meds,
+            safetyAdvice = safety,
+            testsAndReferrals = tests,
+            followUp = followUp,
+            additionalNotes = notes
+        )
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(BackgroundWhite)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = onBack) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = PrimaryBlue)
+            }
+            Text("Review & Edit", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = PrimaryBlue)
+            Spacer(modifier = Modifier.width(48.dp))
+        }
+
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .verticalScroll(rememberScrollState())
+                .padding(20.dp)
+        ) {
+            EditableSection("Full transcript") {
+                OutlinedTextField(
+                    value = transcriptText,
+                    onValueChange = { transcriptText = it },
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 120.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = PrimaryBlue,
+                        unfocusedBorderColor = CardBorder,
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextPrimary
+                    )
+                )
+            }
+
+            EditableSection("Medication") {
+                medLines.forEachIndexed { i, line ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedTextField(
+                            value = line,
+                            onValueChange = { medLines = medLines.toMutableList().apply { set(i, it) } },
+                            modifier = Modifier.weight(1f),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = PrimaryBlue,
+                                unfocusedBorderColor = CardBorder,
+                                focusedTextColor = TextPrimary,
+                                unfocusedTextColor = TextPrimary
+                            )
+                        )
+                        IconButton(onClick = { medLines = medLines.toMutableList().apply { removeAt(i) }.ifEmpty { mutableListOf("") } }) {
+                            Icon(Icons.Default.Delete, "Remove", tint = AccentRed, modifier = Modifier.size(24.dp))
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+                TextButton(onClick = { medLines = medLines.toMutableList().apply { add("") } }) {
+                    Text("+ Add medication", color = PrimaryBlue)
+                }
+            }
+
+            EditableSection("Red flags / Safety") {
+                safetyLines.forEachIndexed { i, line ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedTextField(
+                            value = line,
+                            onValueChange = { safetyLines = safetyLines.toMutableList().apply { set(i, it) } },
+                            modifier = Modifier.weight(1f),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = PrimaryBlue,
+                                unfocusedBorderColor = CardBorder,
+                                focusedTextColor = TextPrimary,
+                                unfocusedTextColor = TextPrimary
+                            )
+                        )
+                        IconButton(onClick = { safetyLines = safetyLines.toMutableList().apply { removeAt(i) }.ifEmpty { mutableListOf("") } }) {
+                            Icon(Icons.Default.Delete, "Remove", tint = AccentRed, modifier = Modifier.size(24.dp))
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+                TextButton(onClick = { safetyLines = safetyLines.toMutableList().apply { add("") } }) {
+                    Text("+ Add safety note", color = PrimaryBlue)
+                }
+            }
+
+            EditableSection("Tests & Referrals") {
+                testLines.forEachIndexed { i, line ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedTextField(
+                            value = line,
+                            onValueChange = { testLines = testLines.toMutableList().apply { set(i, it) } },
+                            modifier = Modifier.weight(1f),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = PrimaryBlue,
+                                unfocusedBorderColor = CardBorder,
+                                focusedTextColor = TextPrimary,
+                                unfocusedTextColor = TextPrimary
+                            )
+                        )
+                        IconButton(onClick = { testLines = testLines.toMutableList().apply { removeAt(i) }.ifEmpty { mutableListOf("") } }) {
+                            Icon(Icons.Default.Delete, "Remove", tint = AccentRed, modifier = Modifier.size(24.dp))
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+                TextButton(onClick = { testLines = testLines.toMutableList().apply { add("") } }) {
+                    Text("+ Add test/referral", color = PrimaryBlue)
+                }
+            }
+
+            EditableSection("Follow-up") {
+                OutlinedTextField(
+                    value = followUpText,
+                    onValueChange = { followUpText = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = { Text("e.g. Come back in 2 weeks", color = TextHint) },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = PrimaryBlue,
+                        unfocusedBorderColor = CardBorder,
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextPrimary
+                    )
+                )
+            }
+
+            EditableSection("Additional notes") {
+                notesLines.forEachIndexed { i, line ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedTextField(
+                            value = line,
+                            onValueChange = { notesLines = notesLines.toMutableList().apply { set(i, it) } },
+                            modifier = Modifier.weight(1f),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = PrimaryBlue,
+                                unfocusedBorderColor = CardBorder,
+                                focusedTextColor = TextPrimary,
+                                unfocusedTextColor = TextPrimary
+                            )
+                        )
+                        IconButton(onClick = { notesLines = notesLines.toMutableList().apply { removeAt(i) }.ifEmpty { mutableListOf("") } }) {
+                            Icon(Icons.Default.Delete, "Remove", tint = AccentRed, modifier = Modifier.size(24.dp))
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+                TextButton(onClick = { notesLines = notesLines.toMutableList().apply { add("") } }) {
+                    Text("+ Add note", color = PrimaryBlue)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+            Button(
+                onClick = {
+                    val updated = appointment.copy(
+                        transcription = appointment.transcription?.copy(fullText = transcriptText) ?: Transcription(transcriptText),
+                        extraction = buildExtraction(),
+                        isLocked = true
+                    )
+                    onSave(updated)
+                },
+                modifier = Modifier.fillMaxWidth().height(56.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = AccentGreen),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Text("Save & Lock", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+            }
+        }
+    }
+}
+
+@Composable
+private fun EditableSection(
+    title: String,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    Text(title, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
+    Spacer(modifier = Modifier.height(8.dp))
+    Column { content() }
+    Spacer(modifier = Modifier.height(20.dp))
+}
 @Composable
 private fun SummarySection(
     emoji: String,

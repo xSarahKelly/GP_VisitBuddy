@@ -43,7 +43,8 @@ class MainActivity : ComponentActivity() {
                     onSelectAppointment = { id -> viewModel.selectAppointment(id) },
                     onDeleteAppointment = { id -> viewModel.deleteAppointment(id) },
                     onClearAppointment = { viewModel.clearCurrentAppointment() },
-                    onClearError = { viewModel.clearError() }
+                    onClearError = { viewModel.clearError() },
+                    onUpdateAppointment = { viewModel.updateAppointment(it) },
                 )
     }
 }
