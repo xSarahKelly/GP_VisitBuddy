@@ -97,6 +97,7 @@ class ExtractionStorage(private val context: Context) {
                     put(JSONObject().apply {
                         put("test_or_referral_type", test.testOrReferralType)
                         put("reason_if_stated", test.reasonIfStated ?: "")
+                        put("destination_if_stated", test.destinationIfStated ?: "")
                         put("urgency", test.urgency ?: "")
                         put("verbatim_quote", test.verbatimQuote ?: "")
                     })
@@ -170,6 +171,7 @@ class ExtractionStorage(private val context: Context) {
                 TestOrReferral(
                     testOrReferralType = test.getString("test_or_referral_type"),
                     reasonIfStated = test.optString("reason_if_stated").takeIf { it.isNotEmpty() },
+                    destinationIfStated = test.optString("destination_if_stated").takeIf { it.isNotEmpty() },
                     urgency = test.optString("urgency").takeIf { it.isNotEmpty() },
                     verbatimQuote = test.optString("verbatim_quote").takeIf { it.isNotEmpty() }
                 )

@@ -32,6 +32,7 @@ data class MedicationInstruction(
 data class TestOrReferral(
     val testOrReferralType: String,
     val reasonIfStated: String? = null,
+    val destinationIfStated: String? = null,
     val urgency: String? = null,
     val verbatimQuote: String? = null
 )

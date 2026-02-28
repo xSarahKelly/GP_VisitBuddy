@@ -17,7 +17,8 @@ data class Appointment(
     val transcription: Transcription? = null,
     val extraction: MedicalExtraction? = null,  // Calgary-Cambridge aligned schema
     val notes: String? = null,
-    val status: AppointmentStatus = AppointmentStatus.DRAFT
+    val status: AppointmentStatus = AppointmentStatus.DRAFT,
+    val isLocked: Boolean = false
 )
 
 /**

@@ -177,6 +177,7 @@ class LocalStorage(private val context: Context) {
             put("audioFilePath", appointment.audioFilePath)
             put("notes", appointment.notes)
             put("status", appointment.status.name)
+            put("isLocked", appointment.isLocked)
             
             appointment.transcription?.let { put("transcription", transcriptionToJson(it)) }
             appointment.extraction?.let { put("extraction", extractionToJson(it)) }
@@ -230,6 +231,7 @@ class LocalStorage(private val context: Context) {
                     put(JSONObject().apply {
                         put("test_or_referral_type", test.testOrReferralType)
                         put("reason_if_stated", test.reasonIfStated ?: "")
+                        put("destination_if_stated", test.destinationIfStated ?: "")
                         put("urgency", test.urgency ?: "")
                         put("verbatim_quote", test.verbatimQuote ?: "")
                     })
@@ -281,6 +283,7 @@ class LocalStorage(private val context: Context) {
             audioFilePath = json.optString("audioFilePath").takeIf { it.isNotEmpty() },
             notes = json.optString("notes").takeIf { it.isNotEmpty() },
             status = AppointmentStatus.valueOf(json.optString("status", "DRAFT")),
+            isLocked = json.optBoolean("isLocked", false),
             transcription = json.optJSONObject("transcription")?.let { jsonToTranscription(it) },
             extraction = json.optJSONObject("extraction")?.let { jsonToExtraction(it) }
         )
@@ -339,6 +342,7 @@ class LocalStorage(private val context: Context) {
                 TestOrReferral(
                     testOrReferralType = test.getString("test_or_referral_type"),
                     reasonIfStated = test.optString("reason_if_stated").takeIf { it.isNotEmpty() },
+                    destinationIfStated = test.optString("destination_if_stated").takeIf { it.isNotEmpty() },
                     urgency = test.optString("urgency").takeIf { it.isNotEmpty() },
                     verbatimQuote = test.optString("verbatim_quote").takeIf { it.isNotEmpty() }
                 )
