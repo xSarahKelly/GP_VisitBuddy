@@ -20,6 +20,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -53,11 +54,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private var currentAudioFile: File? = null
     
     private val _state = MutableStateFlow(AppState())
-    val state: StateFlow<AppState> = _state.asStateFlow()
+    val state: StateFlow<AppState> = _state.stateIn(
+        scope = viewModelScope,
+        started = kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000),
+        initialValue = AppState()
+    )
     
     init {
-        loadAppointments()
         autoLoadModel()
+        loadAppointments()
     }
     
     /**
@@ -541,7 +546,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             recorder.cancelRecording()
             
             // Delete the draft appointment
-            currentAppointmentId?.let { storage.deleteAppointment(it) }
+            currentAppointmentId?.let { id ->
+                withContext(Dispatchers.IO) {
+                    storage.deleteAppointment(id)
+                }
+            }
             
             currentAppointmentId = null
             currentAudioFile = null
@@ -621,7 +630,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             )
             
             if (updatedAppointment != null) {
-                storage.saveAppointment(updatedAppointment)
+                withContext(Dispatchers.IO) {
+                    storage.saveAppointment(updatedAppointment)
+                }
             }
             
             _state.update { 
@@ -710,7 +721,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun clearCurrentAppointment() {
         _state.update { it.copy(currentAppointment = null) }
     }
-    
+
+    fun updateAppointment(appointment: Appointment) {
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                storage.saveAppointment(appointment)
+            }
+            _state.update { it.copy(currentAppointment = appointment) }
+            loadAppointments()
+        }
+    }
     // ========================================================================
     // Utility
     // ========================================================================
