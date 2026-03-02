@@ -4,10 +4,12 @@ import android.app.Application
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.medicalappointmentcompanion.auth.AuthRepository
 import com.example.medicalappointmentcompanion.audio.AudioRecorder
 import com.example.medicalappointmentcompanion.audio.WaveHelper
 import com.example.medicalappointmentcompanion.extraction.SchemaGuidedExtractor
 import com.example.medicalappointmentcompanion.model.AppState
+import com.example.medicalappointmentcompanion.model.UserSession
 import com.example.medicalappointmentcompanion.model.Appointment
 import com.example.medicalappointmentcompanion.model.AppointmentStatus
 import com.example.medicalappointmentcompanion.model.Transcription
@@ -45,6 +47,7 @@ private const val LOG_TAG = "MainViewModel"
 class MainViewModel(application: Application) : AndroidViewModel(application) {
     
     private val storage = LocalStorage(application)
+    private val authRepository = AuthRepository(application)
     private val recorder = AudioRecorder(application)
     
     private var whisperContext: WhisperContext? = null
@@ -61,8 +64,49 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     )
     
     init {
+        loadSession()
         autoLoadModel()
         loadAppointments()
+    }
+
+    private fun loadSession() {
+        viewModelScope.launch {
+            val session = withContext(Dispatchers.IO) { authRepository.getCurrentSession() }
+            _state.update { it.copy(userSession = session, authError = null) }
+        }
+    }
+
+    fun login(username: String, password: String) {
+        viewModelScope.launch {
+            val session = withContext(Dispatchers.IO) { authRepository.login(username, password) }
+            if (session != null) {
+                _state.update { it.copy(userSession = session, authError = null) }
+            } else {
+                _state.update { it.copy(authError = "Invalid username or password.") }
+            }
+        }
+    }
+
+    fun signUp(name: String, username: String, password: String) {
+        viewModelScope.launch {
+            val session = withContext(Dispatchers.IO) { authRepository.signUp(name, username, password) }
+            if (session != null) {
+                _state.update { it.copy(userSession = session, authError = null) }
+            } else {
+                _state.update { it.copy(authError = "This username is already taken. Please choose another.") }
+            }
+        }
+    }
+
+    fun logout() {
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) { authRepository.logout() }
+            _state.update { it.copy(userSession = null, authError = null) }
+        }
+    }
+
+    fun clearAuthError() {
+        _state.update { it.copy(authError = null) }
     }
     
     /**

@@ -4,6 +4,8 @@ package com.example.medicalappointmentcompanion.model
  * Main application UI state
  */
 data class AppState(
+    val userSession: UserSession? = null,
+    val authError: String? = null,
     val isModelLoaded: Boolean = false,
     val isModelLoading: Boolean = false,
     val isModelDownloading: Boolean = false,

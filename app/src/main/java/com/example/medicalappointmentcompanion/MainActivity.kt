@@ -45,8 +45,12 @@ class MainActivity : ComponentActivity() {
                     onClearAppointment = { viewModel.clearCurrentAppointment() },
                     onClearError = { viewModel.clearError() },
                     onUpdateAppointment = { viewModel.updateAppointment(it) },
+                    onLogin = { user, pass -> viewModel.login(user, pass) },
+                    onSignUp = { name, username, password -> viewModel.signUp(name, username, password) },
+                    onLogout = { viewModel.logout() },
+                    onClearAuthError = { viewModel.clearAuthError() },
                 )
-    }
-}
+            }
+        }
     }
 }

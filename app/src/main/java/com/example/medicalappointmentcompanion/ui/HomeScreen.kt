@@ -26,7 +26,8 @@ fun HomeScreen(
     onRequestPermission: () -> Unit,
     onOpenSettings: () -> Unit,
     onLoadModel: () -> Unit,
-    onShowConsent: () -> Unit
+    onShowConsent: () -> Unit,
+    onLogout: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -165,15 +166,30 @@ fun HomeScreen(
             )
         }
 
-        TextButton(
-            onClick = onOpenSettings,
-            modifier = Modifier.height(48.dp)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly
         ) {
-            Text(
-                text = "Privacy & Settings",
-                fontSize = 18.sp,
-                color = AppColors.PrimaryBlue
-            )
+            TextButton(
+                onClick = onOpenSettings,
+                modifier = Modifier.height(48.dp)
+            ) {
+                Text(
+                    text = "Privacy & Settings",
+                    fontSize = 18.sp,
+                    color = AppColors.PrimaryBlue
+                )
+            }
+            TextButton(
+                onClick = onLogout,
+                modifier = Modifier.height(48.dp)
+            ) {
+                Text(
+                    text = "Log out",
+                    fontSize = 18.sp,
+                    color = AppColors.AccentRed
+                )
+            }
         }
     }
 }

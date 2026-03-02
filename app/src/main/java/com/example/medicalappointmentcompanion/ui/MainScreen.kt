@@ -29,6 +29,10 @@ fun MainScreen(
     onClearAppointment: () -> Unit,
     onClearError: () -> Unit,
     onUpdateAppointment: (Appointment) -> Unit,
+    onLogin: (username: String, password: String) -> Unit,
+    onSignUp: (name: String, username: String, password: String) -> Unit,
+    onLogout: () -> Unit,
+    onClearAuthError: () -> Unit,
 ) {
     val context = LocalContext.current
     var hasPermission by remember {
@@ -49,6 +53,7 @@ fun MainScreen(
     var showModelDialog by remember { mutableStateOf(false) }
     var showConsentDialog by remember { mutableStateOf(false) }
     var showReviewScreen by remember { mutableStateOf(false) }
+    var showSignUp by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         if (!hasPermission) {
@@ -68,6 +73,22 @@ fun MainScreen(
             .background(AppColors.BackgroundWhite)
     ) {
         when {
+            // Not logged in - show auth screens
+            state.userSession == null -> {
+                if (showSignUp) {
+                    SignUpScreen(
+                        onSignUp = onSignUp,
+                        onSwitchToLogin = { showSignUp = false; onClearAuthError() },
+                        authError = state.authError
+                    )
+                } else {
+                    LoginScreen(
+                        onLogin = onLogin,
+                        onSwitchToSignUp = { showSignUp = true; onClearAuthError() },
+                        authError = state.authError
+                    )
+                }
+            }
             state.isRecording -> {
                 RecordingScreen(
                     recordingDuration = state.recordingDuration,
@@ -122,7 +143,8 @@ fun MainScreen(
                     onRequestPermission = { permissionLauncher.launch(Manifest.permission.RECORD_AUDIO) },
                     onOpenSettings = { showSettingsDialog = true },
                     onLoadModel = { showModelDialog = true },
-                    onShowConsent = { showConsentDialog = true }
+                    onShowConsent = { showConsentDialog = true },
+                    onLogout = onLogout
                 )
             }
         }
