@@ -24,7 +24,9 @@ fun SummaryScreen(
     onBack: () -> Unit,
     onDelete: () -> Unit,
     onReview: () -> Unit,
-    onSave: (Appointment) -> Unit
+    onSave: (Appointment) -> Unit,
+    canSwitchAccount: Boolean = false,
+    onOpenAccount: () -> Unit = {}
 ) {
     var showDeleteDialog by remember { mutableStateOf(false) }
     var transcriptSaved by remember { mutableStateOf(false) }
@@ -56,6 +58,11 @@ fun SummaryScreen(
                         contentDescription = "Back",
                         tint = AppColors.PrimaryBlue
                     )
+                }
+                if (canSwitchAccount) {
+                    TextButton(onClick = onOpenAccount) {
+                        Text("Switch account", fontSize = 16.sp, color = AppColors.PrimaryBlue)
+                    }
                 }
                 IconButton(onClick = { showDeleteDialog = true }) {
                     Icon(

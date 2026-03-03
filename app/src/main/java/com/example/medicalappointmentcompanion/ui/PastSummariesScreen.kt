@@ -23,7 +23,9 @@ import com.example.medicalappointmentcompanion.model.AppointmentStatus
 fun PastSummariesScreen(
     appointments: List<Appointment>,
     onSelect: (String) -> Unit,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    canSwitchAccount: Boolean = false,
+    onOpenAccount: () -> Unit = {}
 ) {
     Column(
         modifier = Modifier
@@ -52,8 +54,14 @@ fun PastSummariesScreen(
                 text = "Past Summaries",
                 fontSize = 26.sp,
                 fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
-                color = AppColors.PrimaryBlue
+                color = AppColors.PrimaryBlue,
+                modifier = Modifier.weight(1f)
             )
+            if (canSwitchAccount) {
+                TextButton(onClick = onOpenAccount) {
+                    Text("Switch account", fontSize = 16.sp, color = AppColors.PrimaryBlue)
+                }
+            }
         }
 
         if (appointments.isEmpty()) {
