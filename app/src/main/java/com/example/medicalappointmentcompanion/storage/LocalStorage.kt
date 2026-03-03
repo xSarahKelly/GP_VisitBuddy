@@ -56,18 +56,36 @@ class LocalStorage(private val context: Context) {
     fun getAudioDirectory(): File = audioDir
     
     /**
+     * Get the appointments directory for an account
+     */
+    private fun getAccountAppointmentsDir(accountId: String?): File? {
+        if (accountId.isNullOrEmpty()) return null
+        return File(storageDir, accountId).also { it.mkdirs() }
+    }
+
+    /**
+     * Get the audio directory for an account
+     */
+    private fun getAccountAudioDir(accountId: String?): File? {
+        if (accountId.isNullOrEmpty()) return null
+        return File(audioDir, accountId).also { it.mkdirs() }
+    }
+
+    /**
      * Create a new audio file path for recording
      */
-    fun createAudioFilePath(appointmentId: String): String {
-        return File(audioDir, "${appointmentId}.wav").absolutePath
+    fun createAudioFilePath(appointmentId: String, accountId: String?): String {
+        val dir = getAccountAudioDir(accountId) ?: audioDir
+        return File(dir, "${appointmentId}.wav").absolutePath
     }
     
     /**
-     * Save an appointment to local storage
+     * Save an appointment to local storage (account-scoped)
      */
-    fun saveAppointment(appointment: Appointment): Boolean {
+    fun saveAppointment(appointment: Appointment, accountId: String?): Boolean {
+        val dir = getAccountAppointmentsDir(accountId) ?: return false
         return try {
-            val file = File(storageDir, "${appointment.id}.json")
+            val file = File(dir, "${appointment.id}.json")
             file.writeText(appointmentToJson(appointment).toString(2))
             Log.d(LOG_TAG, "Saved appointment: ${appointment.id}")
             true
@@ -78,11 +96,12 @@ class LocalStorage(private val context: Context) {
     }
     
     /**
-     * Load an appointment by ID
+     * Load an appointment by ID (account-scoped)
      */
-    fun loadAppointment(id: String): Appointment? {
+    fun loadAppointment(id: String, accountId: String?): Appointment? {
+        val dir = getAccountAppointmentsDir(accountId) ?: return null
         return try {
-            val file = File(storageDir, "$id.json")
+            val file = File(dir, "$id.json")
             if (!file.exists()) return null
             jsonToAppointment(JSONObject(file.readText()))
         } catch (e: Exception) {
@@ -92,11 +111,12 @@ class LocalStorage(private val context: Context) {
     }
     
     /**
-     * Load all appointments
+     * Load all appointments for the given account
      */
-    fun loadAllAppointments(): List<Appointment> {
+    fun loadAllAppointments(accountId: String?): List<Appointment> {
+        val dir = getAccountAppointmentsDir(accountId) ?: return emptyList()
         return try {
-            storageDir.listFiles { file -> file.extension == "json" }
+            dir.listFiles { file -> file.extension == "json" }
                 ?.mapNotNull { file ->
                     try {
                         jsonToAppointment(JSONObject(file.readText()))
@@ -114,13 +134,14 @@ class LocalStorage(private val context: Context) {
     }
     
     /**
-     * Delete an appointment and its audio file
+     * Delete an appointment and its audio file (account-scoped)
      */
-    fun deleteAppointment(id: String): Boolean {
+    fun deleteAppointment(id: String, accountId: String?): Boolean {
         return try {
-            val jsonFile = File(storageDir, "$id.json")
-            val audioFile = File(audioDir, "$id.wav")
-            
+            val aptDir = getAccountAppointmentsDir(accountId)
+            val audDir = getAccountAudioDir(accountId) ?: audioDir
+            val jsonFile = aptDir?.let { File(it, "$id.json") } ?: File(storageDir, "$id.json")
+            val audioFile = if (accountId != null) File(audDir, "$id.wav") else File(audioDir, "$id.wav")
             var success = true
             if (jsonFile.exists()) {
                 success = jsonFile.delete() && success
@@ -128,7 +149,6 @@ class LocalStorage(private val context: Context) {
             if (audioFile.exists()) {
                 success = audioFile.delete() && success
             }
-            
             Log.d(LOG_TAG, "Deleted appointment: $id, success=$success")
             success
         } catch (e: Exception) {
@@ -146,6 +166,23 @@ class LocalStorage(private val context: Context) {
         return jsonSize + audioSize
     }
     
+    /**
+     * Delete all appointments and audio for an account (when account is deleted)
+     */
+    fun deleteAccountData(accountId: String) {
+        try {
+            val aptDir = File(storageDir, accountId)
+            val audDir = File(audioDir, accountId)
+            aptDir.listFiles()?.forEach { it.delete() }
+            aptDir.delete()
+            audDir.listFiles()?.forEach { it.delete() }
+            audDir.delete()
+            Log.d(LOG_TAG, "Deleted data for account: $accountId")
+        } catch (e: Exception) {
+            Log.e(LOG_TAG, "Failed to delete account data: $accountId", e)
+        }
+    }
+
     /**
      * Clear all local data (use with caution!)
      */
