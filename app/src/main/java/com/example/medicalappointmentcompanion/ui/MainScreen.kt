@@ -29,10 +29,17 @@ fun MainScreen(
     onClearAppointment: () -> Unit,
     onClearError: () -> Unit,
     onUpdateAppointment: (Appointment) -> Unit,
-    onLogin: (username: String, password: String) -> Unit,
-    onSignUp: (name: String, username: String, password: String) -> Unit,
-    onLogout: () -> Unit,
+    onSignIn: (username: String, password: String) -> Unit,
+    onSignUp: (userType: com.example.medicalappointmentcompanion.model.UserType, username: String, password: String) -> Unit,
+    onSignOut: () -> Unit,
     onClearAuthError: () -> Unit,
+    onAddAccount: (username: String, password: String, displayName: String, dateOfBirth: String?, currentMedications: String?) -> Unit,
+    onVerifyAndSwitchAccount: (accountId: String, password: String, onResult: (Boolean) -> Unit) -> Unit,
+    onSwitchAccount: (accountId: String) -> Unit,
+    onUpdateProfile: (displayName: String, dateOfBirth: String?, currentMedications: String?) -> Unit,
+    onCompleteAccountSetup: (displayName: String, dateOfBirth: String?, currentMedications: String?) -> Unit,
+    onDeleteAccount: (accountId: String) -> Unit,
+    getAccountsForUser: () -> List<com.example.medicalappointmentcompanion.model.AccountInfo>,
 ) {
     val context = LocalContext.current
     var hasPermission by remember {
@@ -54,6 +61,8 @@ fun MainScreen(
     var showConsentDialog by remember { mutableStateOf(false) }
     var showReviewScreen by remember { mutableStateOf(false) }
     var showSignUp by remember { mutableStateOf(false) }
+    var showAccountScreen by remember { mutableStateOf(false) }
+    var showAddAccountDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         if (!hasPermission) {
@@ -83,11 +92,18 @@ fun MainScreen(
                     )
                 } else {
                     LoginScreen(
-                        onLogin = onLogin,
+                        onLogin = onSignIn,
                         onSwitchToSignUp = { showSignUp = true; onClearAuthError() },
                         authError = state.authError
                     )
                 }
+            }
+            // Account setup required after sign-up
+            state.userSession != null && !state.userSession!!.setupComplete -> {
+                AccountSetupScreen(
+                    username = state.userSession!!.username,
+                    onComplete = onCompleteAccountSetup
+                )
             }
             state.isRecording -> {
                 RecordingScreen(
@@ -119,7 +135,9 @@ fun MainScreen(
                     onBack = onClearAppointment,
                     onDelete = { onDeleteAppointment(state.currentAppointment!!.id) },
                     onReview = { showReviewScreen = true },
-                    onSave = { state.currentAppointment?.let { onUpdateAppointment(it) } }
+                    onSave = { state.currentAppointment?.let { onUpdateAppointment(it) } },
+                    canSwitchAccount = state.userSession?.canSwitchAccount == true,
+                    onOpenAccount = { showAccountScreen = true }
                 )
             }
 
@@ -127,12 +145,47 @@ fun MainScreen(
                 PastSummariesScreen(
                     appointments = state.appointments,
                     onSelect = onSelectAppointment,
-                    onBack = { showPastSummaries = false }
+                    onBack = { showPastSummaries = false },
+                    canSwitchAccount = state.userSession?.canSwitchAccount == true,
+                    onOpenAccount = { showAccountScreen = true }
+                )
+            }
+
+            showAccountScreen && state.userSession != null -> {
+                val session = state.userSession!!
+                val accounts = getAccountsForUser()
+                val currentAccount = accounts.find { it.accountId == session.accountId }
+                    ?: com.example.medicalappointmentcompanion.model.AccountInfo(
+                        accountId = session.accountId,
+                        username = session.username,
+                        displayName = session.displayName,
+                        userType = session.userType
+                    )
+                AccountScreen(
+                    currentAccount = currentAccount,
+                    accounts = accounts,
+                    currentAccountId = state.userSession!!.accountId,
+                    isCarer = state.userSession!!.userType == com.example.medicalappointmentcompanion.model.UserType.Carer,
+                    onBack = { showAccountScreen = false },
+                    onSaveProfile = { name, dob, meds ->
+                        onUpdateProfile(name, dob, meds)
+                    },
+                    onSwitchAccount = { id ->
+                        onSwitchAccount(id)
+                        showAccountScreen = false
+                    },
+                    onVerifyAndSwitchAccount = onVerifyAndSwitchAccount,
+                    onShowAddAccount = { showAddAccountDialog = true },
+                    onDeleteAccount = { id ->
+                        onDeleteAccount(id)
+                        showAccountScreen = false
+                    }
                 )
             }
 
             else -> {
                 HomeScreen(
+                    userSession = state.userSession,
                     isModelLoaded = state.isModelLoaded,
                     isModelLoading = state.isModelLoading,
                     isModelDownloading = state.isModelDownloading,
@@ -144,7 +197,8 @@ fun MainScreen(
                     onOpenSettings = { showSettingsDialog = true },
                     onLoadModel = { showModelDialog = true },
                     onShowConsent = { showConsentDialog = true },
-                    onLogout = onLogout
+                    onLogout = onSignOut,
+                    onShowAccount = { showAccountScreen = true }
                 )
             }
         }
@@ -194,6 +248,17 @@ fun MainScreen(
             onRetry = {
                 showModelDialog = false
                 onRetryModelLoad()
+            }
+        )
+    }
+
+    if (showAddAccountDialog) {
+        AddAccountDialog(
+            onDismiss = { showAddAccountDialog = false },
+            onAddAccount = { user, pass, name, dob, meds ->
+                onAddAccount(user, pass, name, dob, meds)
+                showAddAccountDialog = false
+                showAccountScreen = false
             }
         )
     }

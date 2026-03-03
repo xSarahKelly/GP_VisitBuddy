@@ -45,10 +45,23 @@ class MainActivity : ComponentActivity() {
                     onClearAppointment = { viewModel.clearCurrentAppointment() },
                     onClearError = { viewModel.clearError() },
                     onUpdateAppointment = { viewModel.updateAppointment(it) },
-                    onLogin = { user, pass -> viewModel.login(user, pass) },
-                    onSignUp = { name, username, password -> viewModel.signUp(name, username, password) },
-                    onLogout = { viewModel.logout() },
+                    onSignIn = { user, pass -> viewModel.signIn(user, pass) },
+                    onSignUp = { userType, username, password ->
+                        viewModel.signUp(userType, username, password)
+                    },
+                    onSignOut = { viewModel.signOut() },
                     onClearAuthError = { viewModel.clearAuthError() },
+                    onAddAccount = { user, pass, name, dob, meds -> viewModel.addAccount(user, pass, name, dob, meds) },
+                    onVerifyAndSwitchAccount = { id, pass, onResult ->
+                        viewModel.verifyAndSwitchAccount(id, pass, onResult)
+                    },
+                    onSwitchAccount = { viewModel.switchAccount(it) },
+                    onUpdateProfile = { name, dob, meds -> viewModel.updateProfile(name, dob, meds) },
+                    onCompleteAccountSetup = { name, dob, meds ->
+                        viewModel.completeAccountSetup(name, dob, meds)
+                    },
+                    onDeleteAccount = { id -> viewModel.deleteAccount(id) },
+                    getAccountsForUser = { viewModel.getAccountsForUser() },
                 )
             }
         }
