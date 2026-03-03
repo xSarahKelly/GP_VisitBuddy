@@ -1,6 +1,8 @@
 package com.example.medicalappointmentcompanion.ui
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -15,6 +17,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.medicalappointmentcompanion.model.UserType
 
 @Composable
 fun LoginScreen(
@@ -130,14 +133,14 @@ fun LoginScreen(
 
 @Composable
 fun SignUpScreen(
-    onSignUp: (name: String, username: String, password: String) -> Unit,
+    onSignUp: (userType: UserType, username: String, password: String) -> Unit,
     onSwitchToLogin: () -> Unit,
     authError: String?
 ) {
-    var name by remember { mutableStateOf("") }
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
+    var userType by remember { mutableStateOf(UserType.Patient) }
 
     Column(
         modifier = Modifier
@@ -167,24 +170,54 @@ fun SignUpScreen(
 
         Spacer(modifier = Modifier.height(48.dp))
 
-        OutlinedTextField(
-            value = name,
-            onValueChange = { name = it },
-            label = { Text("Name") },
-            placeholder = { Text("Your name") },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = AppColors.PrimaryBlue,
-                unfocusedBorderColor = AppColors.CardBorder,
-                focusedLabelColor = AppColors.PrimaryBlue,
-                unfocusedLabelColor = AppColors.TextSecondary,
-                focusedTextColor = AppColors.TextPrimary,
-                unfocusedTextColor = AppColors.TextPrimary
-            ),
-            shape = RoundedCornerShape(12.dp)
+        Text(
+            text = "Account type",
+            fontSize = 14.sp,
+            color = AppColors.TextSecondary,
+            modifier = Modifier.fillMaxWidth()
         )
-
+        Spacer(modifier = Modifier.height(8.dp))
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .selectableGroup(),
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Row(
+                modifier = Modifier
+                    .weight(1f)
+                    .selectable(
+                        selected = userType == UserType.Patient,
+                        onClick = { userType = UserType.Patient }
+                    ),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                RadioButton(
+                    selected = userType == UserType.Patient,
+                    onClick = { userType = UserType.Patient },
+                    colors = RadioButtonDefaults.colors(selectedColor = AppColors.PrimaryBlue)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Patient", color = AppColors.TextPrimary)
+            }
+            Row(
+                modifier = Modifier
+                    .weight(1f)
+                    .selectable(
+                        selected = userType == UserType.Carer,
+                        onClick = { userType = UserType.Carer }
+                    ),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                RadioButton(
+                    selected = userType == UserType.Carer,
+                    onClick = { userType = UserType.Carer },
+                    colors = RadioButtonDefaults.colors(selectedColor = AppColors.PrimaryBlue)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Carer", color = AppColors.TextPrimary)
+            }
+        }
         Spacer(modifier = Modifier.height(16.dp))
 
         OutlinedTextField(
@@ -267,7 +300,7 @@ fun SignUpScreen(
         Button(
             onClick = {
                 if (password != confirmPassword) return@Button
-                onSignUp(name, username, password)
+                onSignUp(userType, username, password)
             },
             modifier = Modifier
                 .fillMaxWidth()
