@@ -12,6 +12,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.medicalappointmentcompanion.model.*
@@ -20,7 +21,8 @@ import com.example.medicalappointmentcompanion.model.*
 fun ReviewScreen(
     appointment: Appointment,
     onSave: (Appointment) -> Unit,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onAddToCalendar: () -> Unit = {}
 ) {
     var transcriptText by remember(appointment.id) {
         mutableStateOf(appointment.transcription?.fullText ?: "")
@@ -127,6 +129,7 @@ fun ReviewScreen(
                     value = transcriptText,
                     onValueChange = { transcriptText = it },
                     modifier = Modifier.fillMaxWidth().heightIn(min = 120.dp),
+                    textStyle = TextStyle(fontSize = 18.sp),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = AppColors.PrimaryBlue,
                         unfocusedBorderColor = AppColors.CardBorder,
@@ -146,6 +149,7 @@ fun ReviewScreen(
                             value = line,
                             onValueChange = { medLines = medLines.toMutableList().apply { set(i, it) } },
                             modifier = Modifier.weight(1f),
+                            textStyle = TextStyle(fontSize = 18.sp),
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedBorderColor = AppColors.PrimaryBlue,
                                 unfocusedBorderColor = AppColors.CardBorder,
@@ -174,6 +178,7 @@ fun ReviewScreen(
                             value = line,
                             onValueChange = { safetyLines = safetyLines.toMutableList().apply { set(i, it) } },
                             modifier = Modifier.weight(1f),
+                            textStyle = TextStyle(fontSize = 18.sp),
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedBorderColor = AppColors.PrimaryBlue,
                                 unfocusedBorderColor = AppColors.CardBorder,
@@ -202,6 +207,7 @@ fun ReviewScreen(
                             value = line,
                             onValueChange = { testLines = testLines.toMutableList().apply { set(i, it) } },
                             modifier = Modifier.weight(1f),
+                            textStyle = TextStyle(fontSize = 18.sp),
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedBorderColor = AppColors.PrimaryBlue,
                                 unfocusedBorderColor = AppColors.CardBorder,
@@ -225,6 +231,7 @@ fun ReviewScreen(
                     value = followUpText,
                     onValueChange = { followUpText = it },
                     modifier = Modifier.fillMaxWidth(),
+                    textStyle = TextStyle(fontSize = 18.sp),
                     placeholder = { Text("e.g. Come back in 2 weeks", color = AppColors.TextHint) },
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = AppColors.PrimaryBlue,
@@ -245,6 +252,7 @@ fun ReviewScreen(
                             value = line,
                             onValueChange = { notesLines = notesLines.toMutableList().apply { set(i, it) } },
                             modifier = Modifier.weight(1f),
+                            textStyle = TextStyle(fontSize = 18.sp),
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedBorderColor = AppColors.PrimaryBlue,
                                 unfocusedBorderColor = AppColors.CardBorder,

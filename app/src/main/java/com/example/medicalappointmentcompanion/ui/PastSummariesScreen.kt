@@ -148,7 +148,7 @@ private fun AppointmentCard(
 
                 Text(
                     text = AppUtils.formatDate(appointment.dateTime),
-                    fontSize = 16.sp,
+                    fontSize = 18.sp,
                     color = AppColors.TextSecondary
                 )
 
@@ -156,7 +156,7 @@ private fun AppointmentCard(
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = it.fullText.take(50) + if (it.fullText.length > 50) "..." else "",
-                        fontSize = 16.sp,
+                        fontSize = 18.sp,
                         color = AppColors.TextHint,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
@@ -166,7 +166,7 @@ private fun AppointmentCard(
 
             Icon(
                 imageVector = Icons.Default.ChevronRight,
-                contentDescription = null,
+                contentDescription = "View details",
                 tint = AppColors.TextHint,
                 modifier = Modifier.size(32.dp)
             )

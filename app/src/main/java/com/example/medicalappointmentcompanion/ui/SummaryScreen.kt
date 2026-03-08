@@ -25,6 +25,7 @@ fun SummaryScreen(
     onDelete: () -> Unit,
     onReview: () -> Unit,
     onSave: (Appointment) -> Unit,
+    onAddToCalendar: () -> Unit = {},
     canSwitchAccount: Boolean = false,
     onOpenAccount: () -> Unit = {}
 ) {
@@ -173,7 +174,8 @@ fun SummaryScreen(
                         SummarySection(emoji = "📄", title = "Full Transcription") {
                             Text(
                                 text = transcription.fullText,
-                                style = MaterialTheme.typography.bodyMedium,
+                                fontSize = 18.sp,
+                                lineHeight = 28.sp,
                                 color = AppColors.TextSecondary
                             )
                         }
