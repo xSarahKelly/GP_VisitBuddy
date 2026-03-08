@@ -2,6 +2,9 @@ package com.example.medicalappointmentcompanion.ui
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Logout
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -16,6 +19,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -46,40 +50,56 @@ fun HomeScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(24.dp),
+            .background(AppColors.BackgroundWhite),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Spacer(modifier = Modifier.height(48.dp))
-
-        Text(
-            text = "GP VisitBuddy",
-            fontSize = 28.sp,
-            fontWeight = FontWeight.Bold,
-            color = AppColors.PrimaryBlue,
-            textAlign = TextAlign.Center,
-            lineHeight = 34.sp
-        )
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        Text(
-            text = "An Edge-AI solution for patient recall",
-            fontSize = 20.sp,
-            color = AppColors.TextSecondary,
-            textAlign = TextAlign.Center
-        )
-
-        userSession?.let { session ->
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = "Signed in as ${session.displayName} (${session.userType.name})",
-                fontSize = 14.sp,
-                color = AppColors.TextSecondary,
-                textAlign = TextAlign.Center
-            )
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(AppColors.PrimaryBlue, AppColors.PrimaryBlueDark)
+                    )
+                )
+        ) {
+            Column(
+                modifier = Modifier.padding(28.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "GP VisitBuddy",
+                    fontSize = 28.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                    textAlign = TextAlign.Center,
+                    lineHeight = 34.sp
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = "An Edge-AI solution for patient recall",
+                    fontSize = 16.sp,
+                    color = Color.White.copy(alpha = 0.9f),
+                    textAlign = TextAlign.Center
+                )
+                userSession?.let { session ->
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text(
+                        text = "Signed in as ${session.displayName} (${session.userType.name})",
+                        fontSize = 14.sp,
+                        color = Color.White.copy(alpha = 0.85f),
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
         }
 
-        Spacer(modifier = Modifier.height(48.dp))
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+        Spacer(modifier = Modifier.height(24.dp))
 
         Button(
             onClick = {
@@ -171,17 +191,23 @@ fun HomeScreen(
 
         Spacer(modifier = Modifier.weight(1f))
 
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(bottom = 16.dp)
+        Card(
+            colors = CardDefaults.cardColors(containerColor = AppColors.PrimaryBlueSubtle),
+            shape = RoundedCornerShape(12.dp),
+            modifier = Modifier.padding(vertical = 8.dp)
         ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(16.dp)
+            ) {
             Text(text = "🔒", fontSize = 20.sp)
             Spacer(modifier = Modifier.width(8.dp))
             Text(
                 text = "All processing happens privately on your device.",
-                fontSize = 18.sp,
+                fontSize = 16.sp,
                 color = AppColors.TextSecondary
             )
+            }
         }
 
         Row(
@@ -189,14 +215,21 @@ fun HomeScreen(
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
             TextButton(onClick = onShowAccount, modifier = Modifier.height(48.dp)) {
+                Icon(Icons.Default.Person, contentDescription = "Account", tint = AppColors.PrimaryBlue, modifier = Modifier.size(20.dp))
+                Spacer(modifier = Modifier.width(8.dp))
                 Text("Account", fontSize = 18.sp, color = AppColors.PrimaryBlue)
             }
             TextButton(onClick = onOpenSettings, modifier = Modifier.height(48.dp)) {
+                Icon(Icons.Default.Settings, contentDescription = "Privacy & Settings", tint = AppColors.PrimaryBlue, modifier = Modifier.size(20.dp))
+                Spacer(modifier = Modifier.width(8.dp))
                 Text("Privacy & Settings", fontSize = 18.sp, color = AppColors.PrimaryBlue)
             }
             TextButton(onClick = onLogout, modifier = Modifier.height(48.dp)) {
+                Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = "Log out", tint = AppColors.AccentRed, modifier = Modifier.size(20.dp))
+                Spacer(modifier = Modifier.width(8.dp))
                 Text("Log out", fontSize = 18.sp, color = AppColors.AccentRed)
             }
+        }
         }
     }
 }
@@ -217,7 +250,8 @@ private fun AccountCard(
             )
             .clickable(onClick = onClick),
         colors = CardDefaults.cardColors(containerColor = AppColors.SurfaceWhite),
-        shape = RoundedCornerShape(16.dp)
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Row(
             modifier = Modifier
@@ -232,7 +266,7 @@ private fun AccountCard(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = account.displayName.ifEmpty { account.username },
-                    fontSize = 18.sp,
+                    fontSize = 20.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = AppColors.TextPrimary
                 )
@@ -241,12 +275,12 @@ private fun AccountCard(
                 val medsStr = account.currentMedications?.take(60)?.let { if ((account.currentMedications?.length ?: 0) > 60) "$it…" else it } ?: "—"
                 Text(
                     text = "Age: $ageStr · DOB: $dobStr",
-                    fontSize = 14.sp,
+                    fontSize = 18.sp,
                     color = AppColors.TextSecondary
                 )
                 Text(
                     text = "Medications: $medsStr",
-                    fontSize = 14.sp,
+                    fontSize = 18.sp,
                     color = AppColors.TextSecondary,
                     modifier = Modifier.padding(top = 2.dp)
                 )
@@ -288,55 +322,70 @@ fun AccountSetupScreen(
         )
         Spacer(modifier = Modifier.height(32.dp))
 
-        OutlinedTextField(
-            value = displayName,
-            onValueChange = { displayName = it },
-            label = { Text("Name") },
-            modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = AppColors.PrimaryBlue,
-                unfocusedBorderColor = AppColors.CardBorder
-            ),
-            shape = RoundedCornerShape(12.dp)
-        )
-        OutlinedTextField(
-            value = dateOfBirth,
-            onValueChange = { dateOfBirth = it },
-            label = { Text("Date of birth") },
-            placeholder = { Text("YYYY-MM-DD") },
-            modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = AppColors.PrimaryBlue,
-                unfocusedBorderColor = AppColors.CardBorder
-            ),
-            shape = RoundedCornerShape(12.dp)
-        )
-        OutlinedTextField(
-            value = currentMedications,
-            onValueChange = { currentMedications = it },
-            label = { Text("Current medications") },
-            placeholder = { Text("e.g. Aspirin, Metformin") },
-            modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp),
-            minLines = 2,
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = AppColors.PrimaryBlue,
-                unfocusedBorderColor = AppColors.CardBorder
-            ),
-            shape = RoundedCornerShape(12.dp)
-        )
-        Button(
-            onClick = {
-                onComplete(
-                    displayName.trim().ifEmpty { username },
-                    dateOfBirth.trim().takeIf { it.isNotEmpty() },
-                    currentMedications.trim().takeIf { it.isNotEmpty() }
-                )
-            },
-            modifier = Modifier.fillMaxWidth().height(56.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = AppColors.PrimaryBlue),
-            shape = RoundedCornerShape(16.dp)
+        Card(
+            colors = CardDefaults.cardColors(containerColor = AppColors.SurfaceWhite),
+            shape = RoundedCornerShape(20.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+            modifier = Modifier.fillMaxWidth()
         ) {
-            Text("Continue", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+            Column(modifier = Modifier.padding(20.dp)) {
+                Text("Your details", fontSize = 20.sp, fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary)
+                Spacer(modifier = Modifier.height(16.dp))
+                OutlinedTextField(
+                    value = displayName,
+                    onValueChange = { displayName = it },
+                    label = { Text("Name", fontSize = 18.sp) },
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                    textStyle = TextStyle(fontSize = 18.sp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = AppColors.PrimaryBlue,
+                        unfocusedBorderColor = AppColors.CardBorder,
+                        focusedLabelColor = AppColors.PrimaryBlue,
+                        unfocusedLabelColor = AppColors.TextSecondary,
+                        focusedTextColor = AppColors.TextPrimary,
+                        unfocusedTextColor = AppColors.TextPrimary
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                )
+                DatePickerField(
+                    value = dateOfBirth,
+                    onValueChange = { dateOfBirth = it },
+                    label = "Date of birth",
+                    modifier = Modifier.padding(bottom = 12.dp)
+                )
+                OutlinedTextField(
+                    value = currentMedications,
+                    onValueChange = { currentMedications = it },
+                    label = { Text("Current medications", fontSize = 18.sp) },
+                    placeholder = { Text("e.g. Aspirin, Metformin", fontSize = 18.sp, color = AppColors.TextHint) },
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 20.dp),
+                    minLines = 2,
+                    textStyle = TextStyle(fontSize = 18.sp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = AppColors.PrimaryBlue,
+                        unfocusedBorderColor = AppColors.CardBorder,
+                        focusedLabelColor = AppColors.PrimaryBlue,
+                        unfocusedLabelColor = AppColors.TextSecondary,
+                        focusedTextColor = AppColors.TextPrimary,
+                        unfocusedTextColor = AppColors.TextPrimary
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                )
+                Button(
+                    onClick = {
+                        onComplete(
+                            displayName.trim().ifEmpty { username },
+                            dateOfBirth.trim().takeIf { it.isNotEmpty() },
+                            currentMedications.trim().takeIf { it.isNotEmpty() }
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = AppColors.PrimaryBlue),
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    Text("Continue", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+                }
+            }
         }
     }
 }
@@ -401,62 +450,75 @@ fun AccountScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp)
         ) {
-            Text(
-                text = "Your details",
-                fontSize = 18.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = AppColors.TextPrimary,
-                modifier = Modifier.padding(bottom = 12.dp)
-            )
-            OutlinedTextField(
-                value = displayName,
-                onValueChange = { displayName = it },
-                label = { Text("Name") },
-                modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = AppColors.PrimaryBlue,
-                    unfocusedBorderColor = AppColors.CardBorder
-                ),
-                shape = RoundedCornerShape(12.dp)
-            )
-            OutlinedTextField(
-                value = dateOfBirth,
-                onValueChange = { dateOfBirth = it },
-                label = { Text("Date of birth") },
-                placeholder = { Text("YYYY-MM-DD") },
-                modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = AppColors.PrimaryBlue,
-                    unfocusedBorderColor = AppColors.CardBorder
-                ),
-                shape = RoundedCornerShape(12.dp)
-            )
-            OutlinedTextField(
-                value = currentMedications,
-                onValueChange = { currentMedications = it },
-                label = { Text("Current medications") },
-                placeholder = { Text("e.g. Aspirin, Metformin") },
-                modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
-                minLines = 2,
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = AppColors.PrimaryBlue,
-                    unfocusedBorderColor = AppColors.CardBorder
-                ),
-                shape = RoundedCornerShape(12.dp)
-            )
-            Button(
-                onClick = {
-                    onSaveProfile(
-                        displayName.trim().ifEmpty { currentAccount.username },
-                        dateOfBirth.trim().takeIf { it.isNotEmpty() },
-                        currentMedications.trim().takeIf { it.isNotEmpty() }
-                    )
-                },
-                modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(containerColor = AppColors.PrimaryBlue),
-                shape = RoundedCornerShape(16.dp)
+            Card(
+                colors = CardDefaults.cardColors(containerColor = AppColors.SurfaceWhite),
+                shape = RoundedCornerShape(20.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                modifier = Modifier.fillMaxWidth()
             ) {
-                Text("Save", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+                Column(modifier = Modifier.padding(20.dp)) {
+                    Text(
+                        text = "Your details",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = AppColors.TextPrimary,
+                        modifier = Modifier.padding(bottom = 16.dp)
+                    )
+                    OutlinedTextField(
+                        value = displayName,
+                        onValueChange = { displayName = it },
+                        label = { Text("Name", fontSize = 18.sp) },
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                        textStyle = TextStyle(fontSize = 18.sp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = AppColors.PrimaryBlue,
+                            unfocusedBorderColor = AppColors.CardBorder,
+                            focusedLabelColor = AppColors.PrimaryBlue,
+                            unfocusedLabelColor = AppColors.TextSecondary,
+                            focusedTextColor = AppColors.TextPrimary,
+                            unfocusedTextColor = AppColors.TextPrimary
+                        ),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                    DatePickerField(
+                        value = dateOfBirth,
+                        onValueChange = { dateOfBirth = it },
+                        label = "Date of birth",
+                        modifier = Modifier.padding(bottom = 12.dp)
+                    )
+                    OutlinedTextField(
+                        value = currentMedications,
+                        onValueChange = { currentMedications = it },
+                        label = { Text("Current medications", fontSize = 18.sp) },
+                        placeholder = { Text("e.g. Aspirin, Metformin", fontSize = 18.sp, color = AppColors.TextHint) },
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+                        minLines = 2,
+                        textStyle = TextStyle(fontSize = 18.sp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = AppColors.PrimaryBlue,
+                            unfocusedBorderColor = AppColors.CardBorder,
+                            focusedLabelColor = AppColors.PrimaryBlue,
+                            unfocusedLabelColor = AppColors.TextSecondary,
+                            focusedTextColor = AppColors.TextPrimary,
+                            unfocusedTextColor = AppColors.TextPrimary
+                        ),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                    Button(
+                        onClick = {
+                            onSaveProfile(
+                                displayName.trim().ifEmpty { currentAccount.username },
+                                dateOfBirth.trim().takeIf { it.isNotEmpty() },
+                                currentMedications.trim().takeIf { it.isNotEmpty() }
+                            )
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = AppColors.PrimaryBlue),
+                        shape = RoundedCornerShape(16.dp)
+                    ) {
+                        Text("Save", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+                    }
+                }
             }
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -713,61 +775,75 @@ fun AddAccountDialog(
                 OutlinedTextField(
                     value = username,
                     onValueChange = { username = it },
-                    label = { Text("Username") },
+                    label = { Text("Username", fontSize = 18.sp) },
                     modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                    textStyle = TextStyle(fontSize = 18.sp),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = AppColors.PrimaryBlue,
-                        unfocusedBorderColor = AppColors.CardBorder
+                        unfocusedBorderColor = AppColors.CardBorder,
+                        focusedLabelColor = AppColors.PrimaryBlue,
+                        unfocusedLabelColor = AppColors.TextSecondary,
+                        focusedTextColor = AppColors.TextPrimary,
+                        unfocusedTextColor = AppColors.TextPrimary
                     ),
                     shape = RoundedCornerShape(12.dp)
                 )
                 OutlinedTextField(
                     value = displayName,
                     onValueChange = { displayName = it },
-                    label = { Text("Name") },
-                    placeholder = { Text("e.g. Mum") },
+                    label = { Text("Name", fontSize = 18.sp) },
+                    placeholder = { Text("e.g. Mum", fontSize = 18.sp, color = AppColors.TextHint) },
                     modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                    textStyle = TextStyle(fontSize = 18.sp),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = AppColors.PrimaryBlue,
-                        unfocusedBorderColor = AppColors.CardBorder
+                        unfocusedBorderColor = AppColors.CardBorder,
+                        focusedLabelColor = AppColors.PrimaryBlue,
+                        unfocusedLabelColor = AppColors.TextSecondary,
+                        focusedTextColor = AppColors.TextPrimary,
+                        unfocusedTextColor = AppColors.TextPrimary
                     ),
                     shape = RoundedCornerShape(12.dp)
                 )
-                OutlinedTextField(
+                DatePickerField(
                     value = dateOfBirth,
                     onValueChange = { dateOfBirth = it },
-                    label = { Text("Date of birth") },
-                    placeholder = { Text("YYYY-MM-DD") },
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = AppColors.PrimaryBlue,
-                        unfocusedBorderColor = AppColors.CardBorder
-                    ),
-                    shape = RoundedCornerShape(12.dp)
+                    label = "Date of birth",
+                    modifier = Modifier.padding(bottom = 8.dp)
                 )
                 OutlinedTextField(
                     value = currentMedications,
                     onValueChange = { currentMedications = it },
-                    label = { Text("Current medications") },
-                    placeholder = { Text("e.g. Aspirin, Metformin") },
+                    label = { Text("Current medications", fontSize = 18.sp) },
+                    placeholder = { Text("e.g. Aspirin, Metformin", fontSize = 18.sp, color = AppColors.TextHint) },
                     modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
                     minLines = 2,
+                    textStyle = TextStyle(fontSize = 18.sp),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = AppColors.PrimaryBlue,
-                        unfocusedBorderColor = AppColors.CardBorder
+                        unfocusedBorderColor = AppColors.CardBorder,
+                        focusedLabelColor = AppColors.PrimaryBlue,
+                        unfocusedLabelColor = AppColors.TextSecondary,
+                        focusedTextColor = AppColors.TextPrimary,
+                        unfocusedTextColor = AppColors.TextPrimary
                     ),
                     shape = RoundedCornerShape(12.dp)
                 )
                 OutlinedTextField(
                     value = password,
                     onValueChange = { password = it },
-                    label = { Text("Password") },
+                    label = { Text("Password", fontSize = 18.sp) },
                     visualTransformation = PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                     modifier = Modifier.fillMaxWidth(),
+                    textStyle = TextStyle(fontSize = 18.sp),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = AppColors.PrimaryBlue,
-                        unfocusedBorderColor = AppColors.CardBorder
+                        unfocusedBorderColor = AppColors.CardBorder,
+                        focusedLabelColor = AppColors.PrimaryBlue,
+                        unfocusedLabelColor = AppColors.TextSecondary,
+                        focusedTextColor = AppColors.TextPrimary,
+                        unfocusedTextColor = AppColors.TextPrimary
                     ),
                     shape = RoundedCornerShape(12.dp)
                 )
