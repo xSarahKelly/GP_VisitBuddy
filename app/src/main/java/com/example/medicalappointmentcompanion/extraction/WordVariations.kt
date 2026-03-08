@@ -190,9 +190,11 @@ object WordVariations {
         "ibrofen" to "ibuprofen",
         "ib prophi[n" to "ibuprofen",
         "ibuprofene" to "ibuprofen",
+        "propanolol" to "propranolol",
 
         // Antibiotics
         "co amoxiclav" to "co-amoxiclav",
+        "co-a-moxiclav" to "co-amoxiclav",
         "coamoxiclav" to "co-amoxiclav",
         "doxycyclin" to "doxycycline",
         "clarithromicin" to "clarithromycin",
@@ -244,6 +246,9 @@ object WordVariations {
         "amitriptylin" to "amitriptyline",
         "escitralopram" to "escitalopram",
         "citalapram" to "citalopram",
+        "citallopram" to "citalopram",
+        "cittalaprom" to "citalopram",
+
 
         // Respiratory
         "beclometason" to "beclometasone",
@@ -307,6 +312,8 @@ object WordVariations {
         "flu condosol" to "fluconazole",
         "Yasmin" to "Yazmin",
         "naproxin" to "Naproxen",
+        "niproxin" to "Naproxen",
+        "neproxin" to "Naproxen",
         "Pervira" to "Provera",
         "Provira" to "Provera",
         "Provirah" to "Provera",
