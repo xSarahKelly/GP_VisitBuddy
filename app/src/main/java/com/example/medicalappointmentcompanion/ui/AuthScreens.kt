@@ -1,5 +1,6 @@
 package com.example.medicalappointmentcompanion.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
@@ -11,6 +12,8 @@ import androidx.compose.runtime.*
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -31,92 +34,100 @@ fun LoginScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(24.dp)
-            .verticalScroll(rememberScrollState()),
+            .background(AppColors.BackgroundWhite),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Spacer(modifier = Modifier.height(48.dp))
-
-        Text(
-            text = "GP VisitBuddy",
-            fontSize = 28.sp,
-            fontWeight = FontWeight.Bold,
-            color = AppColors.PrimaryBlue,
-            textAlign = TextAlign.Center
-        )
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        Text(
-            text = "Sign in to continue",
-            fontSize = 18.sp,
-            color = AppColors.TextSecondary,
-            textAlign = TextAlign.Center
-        )
-
-        Spacer(modifier = Modifier.height(48.dp))
-
-        OutlinedTextField(
-            value = username,
-            onValueChange = { username = it },
-            label = { Text("Username") },
-            placeholder = { Text("Enter your username") },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = AppColors.PrimaryBlue,
-                unfocusedBorderColor = AppColors.CardBorder,
-                focusedLabelColor = AppColors.PrimaryBlue,
-                unfocusedLabelColor = AppColors.TextSecondary,
-                focusedTextColor = AppColors.TextPrimary,
-                unfocusedTextColor = AppColors.TextPrimary
-            ),
-            shape = RoundedCornerShape(12.dp)
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        OutlinedTextField(
-            value = password,
-            onValueChange = { password = it },
-            label = { Text("Password") },
-            placeholder = { Text("Enter your password") },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
-            visualTransformation = PasswordVisualTransformation(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = AppColors.PrimaryBlue,
-                unfocusedBorderColor = AppColors.CardBorder,
-                focusedLabelColor = AppColors.PrimaryBlue,
-                unfocusedLabelColor = AppColors.TextSecondary,
-                focusedTextColor = AppColors.TextPrimary,
-                unfocusedTextColor = AppColors.TextPrimary
-            ),
-            shape = RoundedCornerShape(12.dp)
-        )
-
-        authError?.let { error ->
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = error,
-                fontSize = 14.sp,
-                color = AppColors.AccentRed,
-                modifier = Modifier.fillMaxWidth()
-            )
-        }
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        Button(
-            onClick = { onLogin(username, password) },
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(56.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = AppColors.PrimaryBlue),
-            shape = RoundedCornerShape(16.dp)
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(AppColors.PrimaryBlue, AppColors.PrimaryBlueDark)
+                    )
+                )
         ) {
-            Text("Sign In", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+            Column(
+                modifier = Modifier.padding(28.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text("GP VisitBuddy", fontSize = 26.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                Spacer(modifier = Modifier.height(4.dp))
+                Text("Sign in to continue", fontSize = 16.sp, color = Color.White.copy(alpha = 0.9f))
+            }
+        }
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(24.dp)
+                .verticalScroll(rememberScrollState()),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+        Spacer(modifier = Modifier.height(24.dp))
+        Card(
+            colors = CardDefaults.cardColors(containerColor = AppColors.SurfaceWhite),
+            shape = RoundedCornerShape(20.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(24.dp)) {
+                OutlinedTextField(
+                    value = username,
+                    onValueChange = { username = it },
+                    label = { Text("Username") },
+                    placeholder = { Text("Enter your username") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = AppColors.PrimaryBlue,
+                        unfocusedBorderColor = AppColors.CardBorder,
+                        focusedLabelColor = AppColors.PrimaryBlue,
+                        unfocusedLabelColor = AppColors.TextSecondary,
+                        focusedTextColor = AppColors.TextPrimary,
+                        unfocusedTextColor = AppColors.TextPrimary
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                OutlinedTextField(
+                    value = password,
+                    onValueChange = { password = it },
+                    label = { Text("Password") },
+                    placeholder = { Text("Enter your password") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    visualTransformation = PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = AppColors.PrimaryBlue,
+                        unfocusedBorderColor = AppColors.CardBorder,
+                        focusedLabelColor = AppColors.PrimaryBlue,
+                        unfocusedLabelColor = AppColors.TextSecondary,
+                        focusedTextColor = AppColors.TextPrimary,
+                        unfocusedTextColor = AppColors.TextPrimary
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                )
+                authError?.let { error ->
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = error,
+                        fontSize = 16.sp,
+                        color = AppColors.AccentRed,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+                Spacer(modifier = Modifier.height(24.dp))
+                Button(
+                    onClick = { onLogin(username, password) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = AppColors.PrimaryBlue),
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    Text("Sign In", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+                }
+            }
         }
 
         Spacer(modifier = Modifier.height(24.dp))
@@ -127,6 +138,7 @@ fun LoginScreen(
                 fontSize = 16.sp,
                 color = AppColors.PrimaryBlue
             )
+        }
         }
     }
 }
@@ -145,39 +157,50 @@ fun SignUpScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(24.dp)
-            .verticalScroll(rememberScrollState()),
+            .background(AppColors.BackgroundWhite),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Spacer(modifier = Modifier.height(48.dp))
-
-        Text(
-            text = "Create Account",
-            fontSize = 28.sp,
-            fontWeight = FontWeight.Bold,
-            color = AppColors.PrimaryBlue,
-            textAlign = TextAlign.Center
-        )
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        Text(
-            text = "Enter your details to get started",
-            fontSize = 18.sp,
-            color = AppColors.TextSecondary,
-            textAlign = TextAlign.Center
-        )
-
-        Spacer(modifier = Modifier.height(48.dp))
-
-        Text(
-            text = "Account type",
-            fontSize = 14.sp,
-            color = AppColors.TextSecondary,
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(AppColors.PrimaryBlue, AppColors.PrimaryBlueDark)
+                    )
+                )
+        ) {
+            Column(
+                modifier = Modifier.padding(28.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text("Create Account", fontSize = 26.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                Spacer(modifier = Modifier.height(4.dp))
+                Text("Enter your details to get started", fontSize = 16.sp, color = Color.White.copy(alpha = 0.9f))
+            }
+        }
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(24.dp)
+                .verticalScroll(rememberScrollState()),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+        Spacer(modifier = Modifier.height(24.dp))
+        Card(
+            colors = CardDefaults.cardColors(containerColor = AppColors.SurfaceWhite),
+            shape = RoundedCornerShape(20.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
             modifier = Modifier.fillMaxWidth()
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        Row(
+        ) {
+            Column(modifier = Modifier.padding(24.dp)) {
+                Text(
+                    text = "Account type",
+                    fontSize = 16.sp,
+                    color = AppColors.TextSecondary,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .selectableGroup(),
@@ -222,9 +245,9 @@ fun SignUpScreen(
 
         OutlinedTextField(
             value = username,
-            onValueChange = { username = it },
-            label = { Text("Username") },
-            placeholder = { Text("Choose a username") },
+                    onValueChange = { username = it },
+                    label = { Text("Username") },
+                    placeholder = { Text("Choose a username") },
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
             colors = OutlinedTextFieldDefaults.colors(
@@ -235,18 +258,16 @@ fun SignUpScreen(
                 focusedTextColor = AppColors.TextPrimary,
                 unfocusedTextColor = AppColors.TextPrimary
             ),
-            shape = RoundedCornerShape(12.dp)
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        OutlinedTextField(
-            value = password,
-            onValueChange = { password = it },
-            label = { Text("Password") },
-            placeholder = { Text("Choose a password") },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                OutlinedTextField(
+                    value = password,
+                    onValueChange = { password = it },
+                    label = { Text("Password") },
+                    placeholder = { Text("Choose a password") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
             visualTransformation = PasswordVisualTransformation(),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
             colors = OutlinedTextFieldDefaults.colors(
@@ -257,58 +278,54 @@ fun SignUpScreen(
                 focusedTextColor = AppColors.TextPrimary,
                 unfocusedTextColor = AppColors.TextPrimary
             ),
-            shape = RoundedCornerShape(12.dp)
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        OutlinedTextField(
-            value = confirmPassword,
-            onValueChange = { confirmPassword = it },
-            label = { Text("Confirm Password") },
-            placeholder = { Text("Re-enter your password") },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
-            visualTransformation = PasswordVisualTransformation(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = AppColors.PrimaryBlue,
-                unfocusedBorderColor = AppColors.CardBorder,
-                focusedLabelColor = AppColors.PrimaryBlue,
-                unfocusedLabelColor = AppColors.TextSecondary,
-                focusedTextColor = AppColors.TextPrimary,
-                unfocusedTextColor = AppColors.TextPrimary
-            ),
-            shape = RoundedCornerShape(12.dp)
-        )
-
-        val signUpError = authError ?: if (password.isNotEmpty() && confirmPassword.isNotEmpty() && password != confirmPassword)
-            "Passwords do not match" else null
-
-        signUpError?.let { error ->
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = error,
-                fontSize = 14.sp,
-                color = AppColors.AccentRed,
-                modifier = Modifier.fillMaxWidth()
-            )
-        }
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        Button(
-            onClick = {
-                if (password != confirmPassword) return@Button
-                onSignUp(userType, username, password)
-            },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(56.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = AppColors.PrimaryBlue),
-            shape = RoundedCornerShape(16.dp)
-        ) {
-            Text("Create Account", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+                    shape = RoundedCornerShape(12.dp)
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                OutlinedTextField(
+                    value = confirmPassword,
+                    onValueChange = { confirmPassword = it },
+                    label = { Text("Confirm Password") },
+                    placeholder = { Text("Re-enter your password") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    visualTransformation = PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = AppColors.PrimaryBlue,
+                        unfocusedBorderColor = AppColors.CardBorder,
+                        focusedLabelColor = AppColors.PrimaryBlue,
+                        unfocusedLabelColor = AppColors.TextSecondary,
+                        focusedTextColor = AppColors.TextPrimary,
+                        unfocusedTextColor = AppColors.TextPrimary
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                )
+                val signUpError = authError ?: if (password.isNotEmpty() && confirmPassword.isNotEmpty() && password != confirmPassword)
+                    "Passwords do not match" else null
+                signUpError?.let { error ->
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = error,
+                        fontSize = 16.sp,
+                        color = AppColors.AccentRed,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+                Spacer(modifier = Modifier.height(24.dp))
+                Button(
+                    onClick = {
+                        if (password != confirmPassword) return@Button
+                        onSignUp(userType, username, password)
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = AppColors.PrimaryBlue),
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    Text("Create Account", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+                }
+            }
         }
 
         Spacer(modifier = Modifier.height(24.dp))
@@ -319,6 +336,7 @@ fun SignUpScreen(
                 fontSize = 16.sp,
                 color = AppColors.PrimaryBlue
             )
+        }
         }
     }
 }
