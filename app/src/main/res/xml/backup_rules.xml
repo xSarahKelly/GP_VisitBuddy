@@ -6,8 +6,8 @@
    See https://developer.android.com/about/versions/12/backup-restore
 -->
 <full-backup-content>
-    <!--
-   <include domain="sharedpref" path="."/>
-   <exclude domain="sharedpref" path="device.xml"/>
--->
+    <!-- Exclude encrypted data - restore would fail without original key -->
+    <exclude domain="sharedpref" path="gp_visitbuddy_auth_encrypted.xml"/>
+    <exclude domain="sharedpref" path="__androidx_security_crypto_encrypted_file_pref__.xml"/>
+    <exclude domain="file" path="appointments/"/>
 </full-backup-content>

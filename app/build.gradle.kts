@@ -121,6 +121,9 @@ dependencies {
     // OkHttp for HTTP downloads
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     
+    // Encryption for sensitive data (auth, appointments)
+    implementation("androidx.security:security-crypto:1.1.0-alpha06")
+    
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

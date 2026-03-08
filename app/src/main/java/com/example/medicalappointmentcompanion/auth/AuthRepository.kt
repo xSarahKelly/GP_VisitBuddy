@@ -2,6 +2,8 @@ package com.example.medicalappointmentcompanion.auth
 
 import android.content.Context
 import android.util.Log
+import androidx.security.crypto.EncryptedSharedPreferences
+import androidx.security.crypto.MasterKey
 import com.example.medicalappointmentcompanion.model.AccountInfo
 import com.example.medicalappointmentcompanion.model.UserSession
 import com.example.medicalappointmentcompanion.model.UserType
@@ -36,7 +38,37 @@ private data class StoredAccount(
  */
 class AuthRepository(private val context: Context) {
 
-    private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    private val prefs: android.content.SharedPreferences = run {
+        val masterKey = MasterKey.Builder(context)
+            .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+            .build()
+        EncryptedSharedPreferences.create(
+            context,
+            "gp_visitbuddy_auth_encrypted",
+            masterKey,
+            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+        ).also { encrypted ->
+            migrateFromLegacyIfNeeded(encrypted)
+        }
+    }
+
+    private fun migrateFromLegacyIfNeeded(encrypted: android.content.SharedPreferences) {
+        val legacy = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val accountsJson = legacy.getString(KEY_ACCOUNTS, null)
+        if (!accountsJson.isNullOrEmpty()) {
+            try {
+                encrypted.edit()
+                    .putString(KEY_ACCOUNTS, accountsJson)
+                    .putString(KEY_CURRENT_ACCOUNT_ID, legacy.getString(KEY_CURRENT_ACCOUNT_ID, null))
+                    .apply()
+                legacy.edit().clear().apply()
+                Log.d(LOG_TAG, "Migrated auth data to encrypted storage")
+            } catch (e: Exception) {
+                Log.e(LOG_TAG, "Migration failed", e)
+            }
+        }
+    }
 
     private val _userSession = MutableStateFlow<UserSession?>(null)
     val userSession: StateFlow<UserSession?> = _userSession.asStateFlow()

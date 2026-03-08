@@ -2,6 +2,8 @@ package com.example.medicalappointmentcompanion.storage
 
 import android.content.Context
 import android.util.Log
+import androidx.security.crypto.EncryptedFile
+import androidx.security.crypto.MasterKey
 import com.example.medicalappointmentcompanion.model.*
 import org.json.JSONArray
 import org.json.JSONObject
@@ -18,7 +20,13 @@ private const val LOG_TAG = "LocalStorage"
  * Schema aligned with Calgary-Cambridge model extraction.
  */
 class LocalStorage(private val context: Context) {
-    
+
+    private val masterKey: MasterKey by lazy {
+        MasterKey.Builder(context)
+            .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+            .build()
+    }
+
     private val storageDir: File by lazy {
         File(context.filesDir, "appointments").also { it.mkdirs() }
     }
@@ -80,14 +88,23 @@ class LocalStorage(private val context: Context) {
     }
     
     /**
-     * Save an appointment to local storage (account-scoped)
+     * Save an appointment to local storage (account-scoped, encrypted)
      */
     fun saveAppointment(appointment: Appointment, accountId: String?): Boolean {
         val dir = getAccountAppointmentsDir(accountId) ?: return false
         return try {
             val file = File(dir, "${appointment.id}.json")
-            file.writeText(appointmentToJson(appointment).toString(2))
-            Log.d(LOG_TAG, "Saved appointment: ${appointment.id}")
+            file.delete() // EncryptedFile requires file to not exist
+            val encryptedFile = EncryptedFile.Builder(
+                context,
+                file,
+                masterKey,
+                EncryptedFile.FileEncryptionScheme.AES256_GCM_HKDF_4KB
+            ).build()
+            encryptedFile.openFileOutput().use { out ->
+                out.write(appointmentToJson(appointment).toString(2).toByteArray(Charsets.UTF_8))
+            }
+            Log.d(LOG_TAG, "Saved appointment (encrypted): ${appointment.id}")
             true
         } catch (e: Exception) {
             Log.e(LOG_TAG, "Failed to save appointment", e)
@@ -96,14 +113,25 @@ class LocalStorage(private val context: Context) {
     }
     
     /**
-     * Load an appointment by ID (account-scoped)
+     * Load an appointment by ID (account-scoped, supports encrypted and legacy plain)
      */
     fun loadAppointment(id: String, accountId: String?): Appointment? {
         val dir = getAccountAppointmentsDir(accountId) ?: return null
+        val file = File(dir, "$id.json")
+        if (!file.exists()) return null
         return try {
-            val file = File(dir, "$id.json")
-            if (!file.exists()) return null
-            jsonToAppointment(JSONObject(file.readText()))
+            val json = try {
+                val encryptedFile = EncryptedFile.Builder(
+                    context,
+                    file,
+                    masterKey,
+                    EncryptedFile.FileEncryptionScheme.AES256_GCM_HKDF_4KB
+                ).build()
+                encryptedFile.openFileInput().use { it.readBytes().toString(Charsets.UTF_8) }
+            } catch (_: java.security.GeneralSecurityException) {
+                file.readText() // Fallback: legacy plain JSON
+            }
+            jsonToAppointment(JSONObject(json))
         } catch (e: Exception) {
             Log.e(LOG_TAG, "Failed to load appointment: $id", e)
             null
@@ -116,14 +144,9 @@ class LocalStorage(private val context: Context) {
     fun loadAllAppointments(accountId: String?): List<Appointment> {
         val dir = getAccountAppointmentsDir(accountId) ?: return emptyList()
         return try {
-            dir.listFiles { file -> file.extension == "json" }
+            dir.listFiles { f -> f.extension == "json" }
                 ?.mapNotNull { file ->
-                    try {
-                        jsonToAppointment(JSONObject(file.readText()))
-                    } catch (e: Exception) {
-                        Log.w(LOG_TAG, "Failed to parse appointment: ${file.name}", e)
-                        null
-                    }
+                    loadAppointment(file.nameWithoutExtension, accountId)
                 }
                 ?.sortedByDescending { it.dateTime }
                 ?: emptyList()
