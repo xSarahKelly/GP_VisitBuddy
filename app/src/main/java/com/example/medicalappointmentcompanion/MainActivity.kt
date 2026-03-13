@@ -44,6 +44,7 @@ class MainActivity : ComponentActivity() {
                     onDeleteAppointment = { id -> viewModel.deleteAppointment(id) },
                     onClearAppointment = { viewModel.clearCurrentAppointment() },
                     onClearError = { viewModel.clearError() },
+                    onClearSuccessMessage = { viewModel.clearSuccessMessage() },
                     onUpdateAppointment = { viewModel.updateAppointment(it) },
                     onSignIn = { user, pass -> viewModel.signIn(user, pass) },
                     onSignUp = { userType, username, password ->
@@ -62,6 +63,15 @@ class MainActivity : ComponentActivity() {
                     },
                     onDeleteAccount = { id -> viewModel.deleteAccount(id) },
                     getAccountsForUser = { viewModel.getAccountsForUser() },
+                    onScheduleReminder = { accountId, appointmentId, medicationName, dosage, hour, minute ->
+                        viewModel.scheduleMedicationReminder(accountId, appointmentId, medicationName, dosage, hour, minute)
+                    },
+                    getRemindersForAppointment = { accountId, appointmentId ->
+                        viewModel.getRemindersForAppointment(accountId, appointmentId)
+                    },
+                    onAddToCurrentMedications = { medicationText ->
+                        viewModel.addMedicationToCurrentMedications(medicationText)
+                    },
                 )
             }
         }

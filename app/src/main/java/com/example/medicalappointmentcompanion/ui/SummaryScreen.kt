@@ -1,5 +1,9 @@
 package com.example.medicalappointmentcompanion.ui
 
+import android.Manifest
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -8,35 +12,59 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import android.content.pm.PackageManager
+import androidx.core.content.ContextCompat
 import com.example.medicalappointmentcompanion.model.Appointment
-import kotlinx.coroutines.delay
+import com.example.medicalappointmentcompanion.model.MedicationInstruction
+import com.example.medicalappointmentcompanion.model.MedicationReminder
+import java.util.Calendar
 
 @Composable
 fun SummaryScreen(
     appointment: Appointment,
+    accountId: String,
     onBack: () -> Unit,
     onDelete: () -> Unit,
     onReview: () -> Unit,
     onSave: (Appointment) -> Unit,
     onAddToCalendar: () -> Unit = {},
     canSwitchAccount: Boolean = false,
-    onOpenAccount: () -> Unit = {}
+    onOpenAccount: () -> Unit = {},
+    onScheduleReminder: (accountId: String, appointmentId: String, medicationName: String, dosage: String?, hour: Int, minute: Int) -> Unit = { _, _, _, _, _, _ -> },
+    existingReminders: List<MedicationReminder> = emptyList(),
+    onAddToCurrentMedications: (String) -> Unit = {}
 ) {
     var showDeleteDialog by remember { mutableStateOf(false) }
     var transcriptSaved by remember { mutableStateOf(false) }
-    var showSavedMessage by remember { mutableStateOf(false) }
+    var medicationForReminder by remember { mutableStateOf<MedicationInstruction?>(null) }
+    val context = LocalContext.current
+    val hasNotificationPermission = remember {
+        Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) ==
+                PackageManager.PERMISSION_GRANTED
+    }
+    var notificationPermissionGranted by remember(hasNotificationPermission) { mutableStateOf(hasNotificationPermission) }
 
-    LaunchedEffect(showSavedMessage) {
-        if (showSavedMessage) {
-            delay(3000)
-            showSavedMessage = false
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        notificationPermissionGranted = granted
+        if (!granted) medicationForReminder = null
+    }
+
+    LaunchedEffect(medicationForReminder) {
+        val med = medicationForReminder ?: return@LaunchedEffect
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !notificationPermissionGranted) {
+            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
     }
 
@@ -106,15 +134,54 @@ fun SummaryScreen(
                     if (extraction.medicationInstructions.isNotEmpty()) {
                         SummarySection(emoji = "💊", title = "Medication") {
                             extraction.medicationInstructions.forEach { med ->
-                                BulletPoint(
-                                    text = buildString {
-                                        append(med.medicineName)
-                                        med.dosage?.let { append(" $it") }
-                                        med.frequency?.let { append(" $it") }
-                                        med.duration?.let { append(", $it") }
-                                        med.specialInstructions?.let { append(" ($it)") }
+                                val medText = buildString {
+                                    append(med.medicineName)
+                                    med.dosage?.let { append(" $it") }
+                                    med.frequency?.let { append(" $it") }
+                                    med.duration?.let { append(", $it") }
+                                    med.specialInstructions?.let { append(" ($it)") }
+                                }
+                                val hasReminder = existingReminders.any { it.medicationName.equals(med.medicineName, ignoreCase = true) }
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 6.dp)
+                                ) {
+                                    Row(verticalAlignment = Alignment.Top) {
+                                        Text("•", fontSize = 20.sp, color = AppColors.TextPrimary)
+                                        Spacer(modifier = Modifier.width(10.dp))
+                                        Text(
+                                            text = medText,
+                                            fontSize = 20.sp,
+                                            color = AppColors.TextPrimary,
+                                            lineHeight = 28.sp,
+                                            modifier = Modifier.weight(1f)
+                                        )
                                     }
-                                )
+                                    Row(
+                                        modifier = Modifier.padding(start = 30.dp, top = 4.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        TextButton(
+                                            onClick = { onAddToCurrentMedications(medText) }
+                                        ) {
+                                            Icon(Icons.AutoMirrored.Filled.PlaylistAdd, contentDescription = "Add to current medications", modifier = Modifier.size(16.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("Add to current meds", fontSize = 13.sp, color = AppColors.PrimaryBlue)
+                                        }
+                                        if (hasReminder) {
+                                            Text("Reminder set", fontSize = 13.sp, color = AppColors.TextSecondary, modifier = Modifier.align(Alignment.CenterVertically))
+                                        } else {
+                                            TextButton(
+                                                onClick = { medicationForReminder = med }
+                                            ) {
+                                                Icon(Icons.Default.Notifications, contentDescription = "Set reminder", modifier = Modifier.size(16.dp))
+                                                Spacer(modifier = Modifier.width(4.dp))
+                                                Text("Set reminder", fontSize = 13.sp, color = AppColors.PrimaryBlue)
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
                         Spacer(modifier = Modifier.height(16.dp))
@@ -210,7 +277,6 @@ fun SummaryScreen(
                         onClick = {
                             onSave(appointment)
                             transcriptSaved = true
-                            showSavedMessage = true
                         },
                         modifier = Modifier
                             .fillMaxWidth()
@@ -224,16 +290,6 @@ fun SummaryScreen(
             }
         }
 
-        if (showSavedMessage) {
-            Snackbar(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(16.dp),
-                containerColor = AppColors.AccentGreen
-            ) {
-                Text("Transcript saved!", color = Color.White)
-            }
-        }
     }
 
     if (showDeleteDialog) {
@@ -258,6 +314,70 @@ fun SummaryScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showDeleteDialog = false }) {
+                    Text("Cancel", color = AppColors.TextSecondary)
+                }
+            },
+            containerColor = AppColors.SurfaceWhite
+        )
+    }
+
+    val canShowReminderPicker = medicationForReminder != null &&
+        (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU || notificationPermissionGranted)
+    if (canShowReminderPicker) {
+        val med = medicationForReminder!!
+        val cal = Calendar.getInstance()
+        var reminderHour by remember { mutableStateOf(cal.get(Calendar.HOUR_OF_DAY)) }
+        var reminderMinute by remember { mutableStateOf((cal.get(Calendar.MINUTE) / 5) * 5) }
+        AlertDialog(
+            onDismissRequest = { medicationForReminder = null },
+            title = { Text("Set reminder for ${med.medicineName}", color = AppColors.TextPrimary) },
+            text = {
+                Column {
+                    Text("Choose a time for your medication reminder", color = AppColors.TextSecondary, modifier = Modifier.padding(bottom = 16.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceEvenly,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("Hour", fontSize = 14.sp, color = AppColors.TextSecondary)
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                TextButton(onClick = { reminderHour = (reminderHour - 1 + 24) % 24 }) { Text("−") }
+                                Text("${reminderHour.toString().padStart(2, '0')}", fontSize = 24.sp, modifier = Modifier.padding(horizontal = 16.dp))
+                                TextButton(onClick = { reminderHour = (reminderHour + 1) % 24 }) { Text("+") }
+                            }
+                        }
+                        Text(":", fontSize = 24.sp)
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("Minute", fontSize = 14.sp, color = AppColors.TextSecondary)
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                TextButton(onClick = { reminderMinute = (reminderMinute - 5 + 60) % 60 }) { Text("−") }
+                                Text("${reminderMinute.toString().padStart(2, '0')}", fontSize = 24.sp, modifier = Modifier.padding(horizontal = 16.dp))
+                                TextButton(onClick = { reminderMinute = (reminderMinute + 5) % 60 }) { Text("+") }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        onScheduleReminder(
+                            accountId,
+                            appointment.id,
+                            med.medicineName,
+                            med.dosage,
+                            reminderHour,
+                            reminderMinute
+                        )
+                        medicationForReminder = null
+                    }
+                ) {
+                    Text("Set reminder", color = AppColors.PrimaryBlue)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { medicationForReminder = null }) {
                     Text("Cancel", color = AppColors.TextSecondary)
                 }
             },

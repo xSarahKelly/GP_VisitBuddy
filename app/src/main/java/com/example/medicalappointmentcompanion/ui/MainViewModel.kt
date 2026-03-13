@@ -14,6 +14,9 @@ import com.example.medicalappointmentcompanion.model.AppointmentStatus
 import com.example.medicalappointmentcompanion.model.Transcription
 import com.example.medicalappointmentcompanion.model.TranscriptionSegmentData
 import com.example.medicalappointmentcompanion.model.UserType
+import com.example.medicalappointmentcompanion.model.MedicationReminder
+import com.example.medicalappointmentcompanion.reminder.ReminderScheduler
+import com.example.medicalappointmentcompanion.reminder.ReminderStorage
 import com.example.medicalappointmentcompanion.storage.LocalStorage
 import com.example.medicalappointmentcompanion.whisper.WhisperContext
 import kotlinx.coroutines.Dispatchers
@@ -49,6 +52,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val storage = LocalStorage(application)
     private val authRepository = AuthRepository(application)
     private val recorder = AudioRecorder(application)
+    private val reminderScheduler = ReminderScheduler(application)
+    private val reminderStorage = ReminderStorage(application)
 
     private var whisperContext: WhisperContext? = null
     private var recordingTimerJob: Job? = null
@@ -193,6 +198,56 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun getAccountsForUser() = authRepository.getAccountsForUser(_state.value.userSession?.accountId ?: "")
+
+    fun scheduleMedicationReminder(
+        accountId: String,
+        appointmentId: String,
+        medicationName: String,
+        dosage: String?,
+        hour: Int,
+        minute: Int
+    ) {
+        val reminder = MedicationReminder(
+            id = java.util.UUID.randomUUID().toString(),
+            accountId = accountId,
+            appointmentId = appointmentId,
+            medicationName = medicationName,
+            dosage = dosage,
+            hour = hour,
+            minute = minute
+        )
+        reminderScheduler.scheduleReminder(reminder)
+        showSuccess("Reminder set for $medicationName")
+    }
+
+    fun getRemindersForAppointment(accountId: String, appointmentId: String): List<MedicationReminder> {
+        return reminderStorage.getRemindersForAppointment(accountId, appointmentId)
+    }
+
+    fun addMedicationToCurrentMedications(medicationText: String) {
+        viewModelScope.launch {
+            val session = _state.value.userSession ?: return@launch
+            val accounts = authRepository.getAccountsForUser(session.accountId)
+            val currentAccount = accounts.find { it.accountId == session.accountId } ?: return@launch
+            val existing = currentAccount.currentMedications?.trim() ?: ""
+            val newMed = medicationText.trim()
+            if (newMed.isBlank()) return@launch
+            val existingList = existing.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+            if (existingList.any { it.equals(newMed, ignoreCase = true) }) {
+                showSuccess("Already in current medications")
+                return@launch
+            }
+            val merged = if (existing.isEmpty()) newMed else "$existing, $newMed"
+            withContext(Dispatchers.IO) {
+                authRepository.updateProfile(
+                    currentAccount.displayName.ifEmpty { currentAccount.username },
+                    currentAccount.dateOfBirth,
+                    merged
+                )
+            }
+            showSuccess("Added to current medications")
+        }
+    }
 
     fun getAllAccounts() = authRepository.getAllAccounts()
 
@@ -449,7 +504,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun deleteAppointment(id: String) {
         viewModelScope.launch {
             val accountId = _state.value.userSession?.accountId
-            withContext(Dispatchers.IO) { storage.deleteAppointment(id, accountId) }
+            withContext(Dispatchers.IO) {
+                storage.deleteAppointment(id, accountId)
+                accountId?.let { reminderScheduler.cancelRemindersForAppointment(it, id) }
+            }
             if (_state.value.currentAppointment?.id == id) {
                 _state.update { it.copy(currentAppointment = null) }
             }

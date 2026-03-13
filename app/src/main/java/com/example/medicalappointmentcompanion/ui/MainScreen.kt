@@ -41,6 +41,9 @@ fun MainScreen(
     onCompleteAccountSetup: (displayName: String, dateOfBirth: String?, currentMedications: String?) -> Unit,
     onDeleteAccount: (accountId: String) -> Unit,
     getAccountsForUser: () -> List<com.example.medicalappointmentcompanion.model.AccountInfo>,
+    onScheduleReminder: (accountId: String, appointmentId: String, medicationName: String, dosage: String?, hour: Int, minute: Int) -> Unit = { _, _, _, _, _, _ -> },
+    getRemindersForAppointment: (accountId: String, appointmentId: String) -> List<com.example.medicalappointmentcompanion.model.MedicationReminder> = { _, _ -> emptyList() },
+    onAddToCurrentMedications: (String) -> Unit = {},
 ) {
     val context = LocalContext.current
     var hasPermission by remember {
@@ -131,14 +134,20 @@ fun MainScreen(
             }
 
             state.currentAppointment != null -> {
+                val appointment = state.currentAppointment!!
+                val accountId = state.userSession?.accountId ?: ""
                 SummaryScreen(
-                    appointment = state.currentAppointment!!,
+                    appointment = appointment,
+                    accountId = accountId,
                     onBack = onClearAppointment,
-                    onDelete = { onDeleteAppointment(state.currentAppointment!!.id) },
+                    onDelete = { onDeleteAppointment(appointment.id) },
                     onReview = { showReviewScreen = true },
                     onSave = { state.currentAppointment?.let { onUpdateAppointment(it) } },
                     canSwitchAccount = state.userSession?.canSwitchAccount == true,
-                    onOpenAccount = { showAccountScreen = true }
+                    onOpenAccount = { showAccountScreen = true },
+                    onScheduleReminder = onScheduleReminder,
+                    existingReminders = getRemindersForAppointment(accountId, appointment.id),
+                    onAddToCurrentMedications = onAddToCurrentMedications
                 )
             }
 
