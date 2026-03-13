@@ -118,6 +118,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     )
                 }
                 _state.update { it.copy(authError = null) }
+                showSuccess("Account added")
             } catch (e: Exception) {
                 _state.update { it.copy(authError = e.message ?: "Could not add account") }
             }
@@ -129,6 +130,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             withContext(Dispatchers.IO) {
                 authRepository.completeAccountSetup(displayName, dateOfBirth, currentMedications)
             }
+            showSuccess("Account setup complete")
         }
     }
 
@@ -138,6 +140,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 storage.deleteAccountData(accountId)
                 authRepository.deleteAccount(accountId)
             }
+            showSuccess("Account deleted")
         }
     }
 
@@ -152,6 +155,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             withContext(Dispatchers.IO) {
                 authRepository.updateProfile(displayName, dateOfBirth, currentMedications)
             }
+            showSuccess("Profile saved")
         }
     }
 
@@ -165,6 +169,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun switchAccount(accountId: String) {
         viewModelScope.launch {
             withContext(Dispatchers.IO) { authRepository.switchAccount(accountId) }
+            showSuccess("Account switched")
         }
     }
 
@@ -179,6 +184,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
             if (ok) {
                 withContext(Dispatchers.IO) { authRepository.switchAccount(accountId) }
+                showSuccess("Account switched")
             }
             withContext(Dispatchers.Main.immediate) {
                 onResult(ok)
@@ -448,6 +454,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _state.update { it.copy(currentAppointment = null) }
             }
             loadAppointments()
+            showSuccess("Recording deleted")
         }
     }
 
@@ -461,11 +468,24 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             withContext(Dispatchers.IO) { storage.saveAppointment(appointment, accountId) }
             _state.update { it.copy(currentAppointment = appointment) }
             loadAppointments()
+            showSuccess("Summary saved")
         }
     }
 
     fun clearError() {
         _state.update { it.copy(errorMessage = null, modelError = null) }
+    }
+
+    private fun showSuccess(message: String) {
+        _state.update { it.copy(successMessage = message) }
+        viewModelScope.launch {
+            delay(3000)
+            _state.update { it.copy(successMessage = null) }
+        }
+    }
+
+    fun clearSuccessMessage() {
+        _state.update { it.copy(successMessage = null) }
     }
 
     override fun onCleared() {

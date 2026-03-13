@@ -28,6 +28,7 @@ fun MainScreen(
     onDeleteAppointment: (String) -> Unit,
     onClearAppointment: () -> Unit,
     onClearError: () -> Unit,
+    onClearSuccessMessage: () -> Unit = {},
     onUpdateAppointment: (Appointment) -> Unit,
     onSignIn: (username: String, password: String) -> Unit,
     onSignUp: (userType: com.example.medicalappointmentcompanion.model.UserType, username: String, password: String) -> Unit,
@@ -200,6 +201,22 @@ fun MainScreen(
                     onLogout = onSignOut,
                     onShowAccount = { showAccountScreen = true }
                 )
+            }
+        }
+
+        state.successMessage?.let { message ->
+            Snackbar(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(16.dp),
+                action = {
+                    TextButton(onClick = onClearSuccessMessage) {
+                        Text("Dismiss", color = Color.White)
+                    }
+                },
+                containerColor = AppColors.AccentGreen
+            ) {
+                Text(message, color = Color.White)
             }
         }
 

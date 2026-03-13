@@ -19,7 +19,7 @@ fun SettingsDialog(
                 Text(text = "🔒", fontSize = 28.sp)
                 Spacer(modifier = Modifier.width(10.dp))
                 Text(
-                    "Privacy & Settings",
+                    "Privacy Info",
                     fontSize = 22.sp,
                     color = AppColors.PrimaryBlue,
                     fontWeight = androidx.compose.ui.text.font.FontWeight.Bold

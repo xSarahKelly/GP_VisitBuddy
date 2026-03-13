@@ -15,12 +15,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.medicalappointmentcompanion.model.UserType
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 
 @Composable
 fun LoginScreen(
@@ -30,6 +35,7 @@ fun LoginScreen(
 ) {
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    var passwordVisible by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -95,8 +101,16 @@ fun LoginScreen(
                     placeholder = { Text("Enter your password") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
-                    visualTransformation = PasswordVisualTransformation(),
+                    visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                    trailingIcon = {
+                        IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                            Icon(
+                                if (passwordVisible) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                                contentDescription = if (passwordVisible) "Hide password" else "Show password"
+                            )
+                        }
+                    },
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = AppColors.PrimaryBlue,
                         unfocusedBorderColor = AppColors.CardBorder,
@@ -153,6 +167,9 @@ fun SignUpScreen(
     var password by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
     var userType by remember { mutableStateOf(UserType.Patient) }
+    var passwordVisible by remember { mutableStateOf(false) }
+    var confirmPasswordVisible by remember { mutableStateOf(false) }
+    var passwordFocused by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -267,29 +284,19 @@ fun SignUpScreen(
                     label = { Text("Password") },
                     placeholder = { Text("Choose a password") },
                     singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-            visualTransformation = PasswordVisualTransformation(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = AppColors.PrimaryBlue,
-                unfocusedBorderColor = AppColors.CardBorder,
-                focusedLabelColor = AppColors.PrimaryBlue,
-                unfocusedLabelColor = AppColors.TextSecondary,
-                focusedTextColor = AppColors.TextPrimary,
-                unfocusedTextColor = AppColors.TextPrimary
-            ),
-                    shape = RoundedCornerShape(12.dp)
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-                OutlinedTextField(
-                    value = confirmPassword,
-                    onValueChange = { confirmPassword = it },
-                    label = { Text("Confirm Password") },
-                    placeholder = { Text("Re-enter your password") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    visualTransformation = PasswordVisualTransformation(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .onFocusChanged { passwordFocused = it.isFocused },
+                    visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                    trailingIcon = {
+                        IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                            Icon(
+                                if (passwordVisible) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                                contentDescription = if (passwordVisible) "Hide password" else "Show password"
+                            )
+                        }
+                    },
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = AppColors.PrimaryBlue,
                         unfocusedBorderColor = AppColors.CardBorder,
@@ -300,8 +307,47 @@ fun SignUpScreen(
                     ),
                     shape = RoundedCornerShape(12.dp)
                 )
-                val signUpError = authError ?: if (password.isNotEmpty() && confirmPassword.isNotEmpty() && password != confirmPassword)
-                    "Passwords do not match" else null
+                val signUpError = authError
+                    ?: AppUtils.validatePassword(password).takeIf { password.isNotEmpty() }
+                    ?: if (password.isNotEmpty() && confirmPassword.isNotEmpty() && password != confirmPassword)
+                        "Passwords do not match" else null
+                if (passwordFocused && signUpError == null) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = AppUtils.PASSWORD_INSTRUCTION,
+                        fontSize = 14.sp,
+                        color = AppColors.TextSecondary,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+                OutlinedTextField(
+                    value = confirmPassword,
+                    onValueChange = { confirmPassword = it },
+                    label = { Text("Confirm Password") },
+                    placeholder = { Text("Re-enter your password") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    visualTransformation = if (confirmPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                    trailingIcon = {
+                        IconButton(onClick = { confirmPasswordVisible = !confirmPasswordVisible }) {
+                            Icon(
+                                if (confirmPasswordVisible) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                                contentDescription = if (confirmPasswordVisible) "Hide password" else "Show password"
+                            )
+                        }
+                    },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = AppColors.PrimaryBlue,
+                        unfocusedBorderColor = AppColors.CardBorder,
+                        focusedLabelColor = AppColors.PrimaryBlue,
+                        unfocusedLabelColor = AppColors.TextSecondary,
+                        focusedTextColor = AppColors.TextPrimary,
+                        unfocusedTextColor = AppColors.TextPrimary
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                )
                 signUpError?.let { error ->
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
@@ -314,6 +360,7 @@ fun SignUpScreen(
                 Spacer(modifier = Modifier.height(24.dp))
                 Button(
                     onClick = {
+                        AppUtils.validatePassword(password)?.let { return@Button }
                         if (password != confirmPassword) return@Button
                         onSignUp(userType, username, password)
                     },

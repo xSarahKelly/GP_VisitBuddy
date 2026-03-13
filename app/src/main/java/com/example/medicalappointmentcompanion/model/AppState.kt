@@ -23,7 +23,8 @@ data class AppState(
     val appointments: List<Appointment> = emptyList(),
     
     val systemInfo: String = "",
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val successMessage: String? = null
 )
 
 /**

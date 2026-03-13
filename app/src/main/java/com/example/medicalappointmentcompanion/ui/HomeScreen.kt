@@ -5,6 +5,8 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -17,11 +19,15 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -215,7 +221,7 @@ fun HomeScreen(
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Icon(Icons.Default.Settings, contentDescription = "Privacy & Settings", tint = AppColors.PrimaryBlue, modifier = Modifier.size(24.dp))
                     Spacer(modifier = Modifier.height(4.dp))
-                    Text("Privacy & Settings", fontSize = 14.sp, color = AppColors.PrimaryBlue)
+                    Text("Privacy Info", fontSize = 14.sp, color = AppColors.PrimaryBlue)
                 }
             }
             TextButton(onClick = onLogout) {
@@ -383,7 +389,10 @@ fun AccountScreen(
     var accountToVerify by remember { mutableStateOf<AccountInfo?>(null) }
     var password by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
+    var passwordVisible by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
+    val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
 
     LaunchedEffect(currentAccount) {
         displayName = currentAccount.displayName.ifEmpty { currentAccount.username }
@@ -463,6 +472,8 @@ fun AccountScreen(
             )
             Button(
                 onClick = {
+                    focusManager.clearFocus()
+                    keyboardController?.hide()
                     onSaveProfile(
                         displayName.trim().ifEmpty { currentAccount.username },
                         dateOfBirth.trim().takeIf { it.isNotEmpty() },
@@ -543,8 +554,16 @@ fun AccountScreen(
                         label = { Text("Password") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
-                        visualTransformation = PasswordVisualTransformation(),
+                        visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                        trailingIcon = {
+                            IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                                Icon(
+                                    if (passwordVisible) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                                    contentDescription = if (passwordVisible) "Hide password" else "Show password"
+                                )
+                            }
+                        },
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = AppColors.PrimaryBlue,
                             unfocusedBorderColor = AppColors.CardBorder
@@ -625,6 +644,7 @@ fun SwitchAccountDialog(
     var selectedAccount by remember { mutableStateOf<AccountInfo?>(null) }
     var password by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
+    var passwordVisible by remember { mutableStateOf(false) }
 
     val otherAccounts = accounts.filter { it.accountId != currentAccountId }
 
@@ -665,8 +685,16 @@ fun SwitchAccountDialog(
                     placeholder = { Text("Account password") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
-                    visualTransformation = PasswordVisualTransformation(),
+                    visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                    trailingIcon = {
+                        IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                            Icon(
+                                if (passwordVisible) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                                contentDescription = if (passwordVisible) "Hide password" else "Show password"
+                            )
+                        }
+                    },
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = AppColors.PrimaryBlue,
                         unfocusedBorderColor = AppColors.CardBorder
@@ -716,6 +744,9 @@ fun AddAccountDialog(
     var displayName by remember { mutableStateOf("") }
     var dateOfBirth by remember { mutableStateOf("") }
     var currentMedications by remember { mutableStateOf("") }
+    var passwordError by remember { mutableStateOf<String?>(null) }
+    var passwordVisible by remember { mutableStateOf(false) }
+    var passwordFocused by remember { mutableStateOf(false) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -771,22 +802,53 @@ fun AddAccountDialog(
                 )
                 OutlinedTextField(
                     value = password,
-                    onValueChange = { password = it },
+                    onValueChange = { password = it; passwordError = null },
                     label = { Text("Password") },
-                    visualTransformation = PasswordVisualTransformation(),
+                    visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .onFocusChanged { passwordFocused = it.isFocused },
+                    trailingIcon = {
+                        IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                            Icon(
+                                if (passwordVisible) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                                contentDescription = if (passwordVisible) "Hide password" else "Show password"
+                            )
+                        }
+                    },
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = AppColors.PrimaryBlue,
                         unfocusedBorderColor = AppColors.CardBorder
                     ),
                     shape = RoundedCornerShape(12.dp)
                 )
+                if (passwordFocused && passwordError == null) {
+                    Text(
+                        text = AppUtils.PASSWORD_INSTRUCTION,
+                        fontSize = 14.sp,
+                        color = AppColors.TextSecondary,
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
+                }
+                passwordError?.let { error ->
+                    Text(
+                        text = error,
+                        fontSize = 14.sp,
+                        color = AppColors.AccentRed,
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
+                }
             }
         },
         confirmButton = {
             TextButton(
                 onClick = {
+                    val pwdError = AppUtils.validatePassword(password)
+                    if (pwdError != null) {
+                        passwordError = pwdError
+                        return@TextButton
+                    }
                     if (username.isNotBlank() && password.isNotBlank()) {
                         onAddAccount(
                             username.trim(),
