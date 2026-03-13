@@ -1,195 +1,175 @@
-# Medical Appointment Companion
+# GP VisitBuddy
 
-A privacy-focused Android app for recording and transcribing medical appointments using local speech-to-text processing with whisper.cpp.
+An edge AI Android app for recording and transcribing GP consultations. All processing happens on-device, no cloud, no APIs. Designed to improve patient recall of medical instructions while keeping data private.
 
 ## Features
 
-- **Local-Only Processing**: All transcription happens on-device. No cloud services, no APIs.
-- **Speech-to-Text**: Uses whisper.cpp for accurate medical conversation transcription.
-- **Schema-Guided Extraction**: Extracts medications, tests, follow-ups, and safety warnings aligned with Calgary-Cambridge consultation model.
-- **Secure Storage**: All data stored locally on the device.
-- **Native Performance**: C++ native layer for efficient model inference.
+- **Local-only processing**: Transcription and extraction run entirely on the device. No internet required after setup.
+- **On-device speech-to-text**: Uses whisper.cpp for accurate transcription of doctor-patient conversations.
+- **Schema-guided extraction**: Pulls out medications, tests, referrals, follow-up steps, and safety advice, aligned with the Calgary-Cambridge consultation model. Only extracts what is explicitly stated (no diagnoses).
+- **Encrypted storage**: Auth data and appointments are encrypted (EncryptedSharedPreferences, EncryptedFile). GDPR-aligned.
+- **Multi-account**: Patient and Carer accounts. Carers can add patient accounts and switch between them (with password verification).
+- **GP consent flow**: Consent dialog before recording to address clinician concerns.
+- **Accessibility**: Date picker for DOB, contrast, typography, and labelled buttons.
+- **Offline-first**: No network permission for core use. Model can be bundled in the APK or placed in Downloads.
 
 ## Project Structure
 
 ```
 app/src/main/
 ├── java/com/example/medicalappointmentcompanion/
-│   ├── MainActivity.kt           # Main entry point
-│   ├── ui/                       # UI layer (Compose)
-│   │   ├── MainScreen.kt         # Main UI composable
-│   │   ├── MainViewModel.kt      # ViewModel for state management
-│   │   └── theme/                # Material theme
-│   ├── audio/                    # Audio recording layer
-│   │   ├── AudioRecorder.kt      # 16kHz audio capture
-│   │   └── WaveHelper.kt         # WAV file handling
-│   ├── whisper/                  # Whisper integration layer
-│   │   ├── WhisperLib.kt         # JNI bindings
-│   │   ├── WhisperContext.kt     # High-level API
-│   │   └── WhisperCpuConfig.kt   # CPU optimization
-│   ├── model/                    # Data models
-│   │   ├── Appointment.kt        # Appointment data classes
-│   │   └── AppState.kt           # UI state
-│   ├── storage/                  # Local storage
-│   │   └── LocalStorage.kt       # JSON-based persistence
-│   └── extraction/               # Schema-guided extraction
-│       └── SchemaGuidedExtractor.kt  # Calgary-Cambridge aligned
-└── cpp/                          # Native C++ layer
-    ├── CMakeLists.txt            # CMake build config
-    ├── native_bridge/            # JNI bridge
-    │   └── whisper_jni.cpp       # JNI implementation
-    └── whisper/                  # Whisper extensions
-        └── whisper_wrapper.h     # Project-specific headers
+│   ├── MainActivity.kt
+│   ├── auth/
+│   │   └── AuthRepository.kt          # Multi-account auth, EncryptedSharedPreferences
+│   ├── ui/
+│   │   ├── MainScreen.kt              # Navigation, auth flow
+│   │   ├── MainViewModel.kt            # State, recording, transcription
+│   │   ├── HomeScreen.kt               # Home, account, footer
+│   │   ├── AuthScreens.kt             # Login, sign up
+│   │   ├── RecordingScreen.kt
+│   │   ├── ProcessingScreen.kt
+│   │   ├── ReviewScreen.kt             # Edit transcript before save
+│   │   ├── SummaryScreen.kt            # Extracted instructions
+│   │   ├── PastSummariesScreen.kt
+│   │   ├── DatePickerField.kt
+│   │   ├── ModelSetupDialog.kt
+│   │   ├── SettingsDialog.kt
+│   │   └── theme/
+│   ├── audio/
+│   │   ├── AudioRecorder.kt
+│   │   └── WaveHelper.kt
+│   ├── whisper/
+│   │   ├── WhisperLib.kt
+│   │   ├── WhisperContext.kt
+│   │   └── WhisperCpuConfig.kt
+│   ├── model/
+│   │   ├── Appointment.kt
+│   │   ├── MedicalSchema.kt
+│   │   ├── UserSession.kt
+│   │   └── AppState.kt
+│   ├── storage/
+│   │   ├── LocalStorage.kt            # EncryptedFile for appointments
+│   │   └── ExtractionStorage.kt
+│   └── extraction/
+│       ├── SchemaGuidedExtractor.kt
+│       └── WordVariations.kt          # ASR error correction (aliases, normalisation)
+└── cpp/
+    ├── CMakeLists.txt
+    ├── native_bridge/whisper_jni.cpp
+    └── whisper/
 ```
 
 ## Requirements
 
-- Android Studio Hedgehog (2023.1.1) or newer
-- Android NDK 26.1.10909125 or compatible
+- Android Studio (recent version)
+- Android NDK (25.x or 26.x recommended)
 - CMake 3.22.1+
 - Min SDK: 26 (Android 8.0)
-- Target SDK: 35
+- Target SDK: 36
 
 ## Setup
 
 ### 1. Clone whisper.cpp
 
-The project expects whisper.cpp to be in the project root:
+The native layer expects whisper.cpp at the project root:
 
 ```bash
-cd MedicalAppointmentCompanion
+cd GP_VisitBuddy
 git clone https://github.com/ggerganov/whisper.cpp.git
 ```
 
-### 2. Download a Whisper Model
+### 2. Add a Whisper model
 
-Download a GGML model file. Recommended for mobile:
+The app looks for a model in this order: app files dir → assets → `/sdcard/Download/`.
+
+**Option A: Bundle in APK (recommended)**  
+Place a model file in `app/src/main/assets/`:
+
+- `ggml-small.en.bin` (~466 MB), better accuracy
+- `ggml-base.en.bin` (~142 MB), good balance
+- `ggml-tiny.bin`, faster, lower accuracy
+
+Download from [whisper.cpp models](https://huggingface.co/ggerganov/whisper.cpp/tree/main) or:
 
 ```bash
-# Tiny model (~75MB) - Fast, lower accuracy
 cd whisper.cpp/models
-./download-ggml-model.sh tiny
-
-# Base model (~142MB) - Good balance
-./download-ggml-model.sh base
-
-# Small model (~466MB) - Better accuracy, slower
-./download-ggml-model.sh small
+./download-ggml-model.sh small   # or base, tiny
+# Copy ggml-small.en.bin to app/src/main/assets/
 ```
 
-### 3. Place the Model
+**Option B: Manual placement**  
+Put the model in the device’s Download folder (e.g. `/sdcard/Download/ggml-small.en.bin`). The app will detect it on startup.
 
-Copy the model to the device's app data directory:
-- `/data/data/com.example.medicalappointmentcompanion/files/models/`
-- Or use `adb push` to copy the model file
-
-### 4. Build the Project
+### 3. Build and run
 
 1. Open the project in Android Studio
-2. Sync Gradle files
+2. Sync Gradle
 3. Build > Make Project
-4. Run on a device/emulator
+4. Run on a device or emulator
 
 ## Usage
 
-1. **Load Model**: Tap the model status indicator and enter the path to your .bin model file
-2. **Grant Permissions**: Allow microphone access when prompted
-3. **Record**: Tap the microphone button to start recording
-4. **Stop**: Tap the stop button to finish and transcribe
-5. **Review**: View the transcription and extracted medical information
+1. **Sign up / log in**: Create a Patient or Carer account (local only).
+2. **Account setup**: Enter display name, DOB, and current medications.
+3. **Model**: On first run, the app loads the model from assets or files. If missing, it shows setup instructions.
+4. **Permissions**: Grant microphone access when prompted.
+5. **Record**: Tap “Start Recording” → confirm GP consent → record → stop.
+6. **Review**: Edit the transcript if needed, then save.
+7. **Summary**: View extracted medications, tests, follow-up, and safety advice.
+8. **Past summaries**: Access previous appointment summaries from the home screen.
+
+Carers can add patient accounts and switch between them (password required) to record and view summaries for each person.
 
 ## Architecture
 
 ### Layers
 
-1. **UI Layer** (Kotlin/Compose)
-   - Material 3 dark theme
-   - State management via ViewModel
-   - Reactive UI with StateFlow
+1. **UI** (Jetpack Compose): Accessibility-focused.
+2. **ViewModel**: StateFlow, coroutines for async work.
+3. **Auth**: EncryptedSharedPreferences, multi-account, Patient/Carer.
+4. **Audio**: AudioRecord at 16 kHz, WAV handling.
+5. **Whisper**: JNI to whisper.cpp, coroutine-based API.
+6. **Extraction**: SchemaGuidedExtractor + WordVariations (phrase normalisation, medication aliases).
+7. **Storage**: EncryptedFile for appointments, migration from legacy plain JSON.
 
-2. **Audio Layer** (Kotlin)
-   - AudioRecord API at 16kHz
-   - WAV file encoding/decoding
-   - Float array conversion for whisper
-
-3. **Whisper Layer** (Kotlin + JNI)
-   - Thread-safe context management
-   - Coroutine-based async API
-   - Architecture-specific optimizations
-
-4. **Native Layer** (C++)
-   - JNI bridge to whisper.cpp
-   - ARM NEON optimizations
-   - FP16 support on compatible devices
-
-5. **Storage Layer** (Kotlin)
-   - JSON serialization
-   - File-based persistence
-   - No external database dependencies
-
-### Data Flow
+### Data flow
 
 ```
-Audio Input → AudioRecorder → FloatArray → WhisperContext → Transcription
-                                                              ↓
-                                                       SchemaGuidedExtractor
-                                                              ↓
-                                                       MedicalExtraction
-                                                              ↓
-                                                       LocalStorage
+Audio → AudioRecorder → WAV → WhisperContext → Transcription
+                                                    ↓
+                                          SchemaGuidedExtractor
+                                                    ↓
+                                          MedicalExtraction
+                                                    ↓
+                                          LocalStorage (encrypted)
 ```
-
-## Model Compatibility
-
-The app automatically selects the optimal library variant:
-
-| Architecture | Library | Optimizations |
-|-------------|---------|---------------|
-| arm64-v8a | whisper_v8fp16_va | ARMv8.2-A FP16 |
-| armeabi-v7a | whisper_vfpv4 | NEON VFPv4 |
-| x86_64/x86 | whisper | Standard |
 
 ## Privacy
 
-- **No Network**: App requires no internet permission
-- **Local Storage**: All data stays on device
-- **No Analytics**: No tracking or telemetry
-- **No Cloud**: No external API calls
+- **No cloud**: No network permission for core features.
+- **Encrypted storage**: Auth and appointments encrypted at rest.
+- **Local only**: Audio and transcripts never leave the device.
+- **No analytics**: No tracking or telemetry.
+- **Backup**: Encrypted data excluded from Android backup (backup_rules.xml).
 
-## Technical Notes
+## Troubleshooting
 
-### NDK Configuration
+**Model not found**  
 
-The project uses:
-- C++17 standard
-- STL: c++_shared
-- CMake 3.22.1
+- Ensure `ggml-small.en.bin` (or base/tiny) is in `app/src/main/assets/` before building.  
+- Or place the model in `/sdcard/Download/` on the device.
 
-### Performance Tips
+**Recording fails**  
 
-1. Use the smallest model that meets your accuracy needs
-2. Keep recordings under 5 minutes for best performance
-3. Ensure good microphone positioning
-4. Use a device with ARM64 for best performance
+- Check microphone permission.  
+- Ensure no other app is using the microphone.
 
-### Troubleshooting
+**Slow transcription**  
 
-**Model won't load:**
-- Check the file path is correct
-- Ensure the model file is not corrupted
-- Verify sufficient device storage
-
-**Recording fails:**
-- Check microphone permission is granted
-- Ensure no other app is using the microphone
-- Try restarting the app
-
-**Slow transcription:**
-- Use a smaller model (tiny or base)
-- Close background apps
-- Ensure device is not in battery saver mode
+- Use a smaller model (base or tiny).  
+- Keep recordings under ~5 minutes.  
+- Close other apps; avoid battery saver.
 
 ## License
 
-This project uses whisper.cpp which is licensed under MIT.
-
+Uses [whisper.cpp](https://github.com/ggerganov/whisper.cpp) (MIT).
