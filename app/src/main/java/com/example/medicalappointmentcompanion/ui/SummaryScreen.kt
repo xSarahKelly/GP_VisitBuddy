@@ -1,7 +1,10 @@
 package com.example.medicalappointmentcompanion.ui
 
 import android.Manifest
+import android.content.ActivityNotFoundException
+import android.content.Intent
 import android.os.Build
+import android.provider.CalendarContract
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -26,6 +29,7 @@ import androidx.core.content.ContextCompat
 import com.example.medicalappointmentcompanion.model.Appointment
 import com.example.medicalappointmentcompanion.model.MedicationInstruction
 import com.example.medicalappointmentcompanion.model.MedicationReminder
+import com.example.medicalappointmentcompanion.reminder.ReminderNotificationHelper
 import java.util.Calendar
 
 @Composable
@@ -46,6 +50,7 @@ fun SummaryScreen(
     var showDeleteDialog by remember { mutableStateOf(false) }
     var transcriptSaved by remember { mutableStateOf(false) }
     var medicationForReminder by remember { mutableStateOf<MedicationInstruction?>(null) }
+    var calendarLaunchError by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val hasNotificationPermission = remember {
         Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
@@ -214,14 +219,50 @@ fun SummaryScreen(
 
                     extraction.followUp?.let { followUp ->
                         SummarySection(emoji = "📅", title = "Follow-Up") {
+                            val followUpText = followUp.verbatimQuote?.takeIf { it.isNotBlank() }
+                                ?: buildString {
+                                    append("Return")
+                                    followUp.timeframe?.let { append(" $it") }
+                                    followUp.locationOrMethod?.let { append(" ($it)") }
+                                }
                             BulletPoint(
-                                text = followUp.verbatimQuote?.takeIf { it.isNotBlank() }
-                                    ?: buildString {
-                                        append("Return")
-                                        followUp.timeframe?.let { append(" $it") }
-                                        followUp.locationOrMethod?.let { append(" ($it)") }
-                                    }
+                                text = followUpText
                             )
+                            TextButton(
+                                onClick = {
+                                    val beginAt = Calendar.getInstance().apply {
+                                        add(Calendar.DAY_OF_YEAR, 7)
+                                    }.timeInMillis
+                                    val intent = Intent(Intent.ACTION_INSERT).apply {
+                                        data = CalendarContract.Events.CONTENT_URI
+                                        putExtra(CalendarContract.Events.TITLE, "GP Follow-up")
+                                        putExtra(
+                                            CalendarContract.Events.DESCRIPTION,
+                                            buildString {
+                                                append("From GP VisitBuddy summary")
+                                                append("\n\n")
+                                                append(followUpText)
+                                                appointment.extraction?.additionalNotes
+                                                    ?.takeIf { it.isNotEmpty() }
+                                                    ?.let {
+                                                        append("\n\nNotes:\n")
+                                                        append(it.joinToString("\n- ", prefix = "- "))
+                                                    }
+                                            }
+                                        )
+                                        putExtra(CalendarContract.EXTRA_EVENT_BEGIN_TIME, beginAt)
+                                        putExtra(CalendarContract.EXTRA_EVENT_END_TIME, beginAt + (30 * 60 * 1000))
+                                    }
+                                    try {
+                                        context.startActivity(intent)
+                                        onAddToCalendar()
+                                    } catch (_: ActivityNotFoundException) {
+                                        calendarLaunchError = true
+                                    }
+                                }
+                            ) {
+                                Text("Add follow-up to calendar", fontSize = 13.sp, color = AppColors.PrimaryBlue)
+                            }
                         }
                         Spacer(modifier = Modifier.height(16.dp))
                     }
@@ -362,6 +403,18 @@ fun SummaryScreen(
             confirmButton = {
                 TextButton(
                     onClick = {
+                        ReminderNotificationHelper.showReminderNotification(
+                            context = context,
+                            reminderId = "${appointment.id}:${med.medicineName}",
+                            medicationName = med.medicineName,
+                            dosage = med.dosage
+                        )
+                    }
+                ) {
+                    Text("Test alert now", color = AppColors.PrimaryBlue)
+                }
+                TextButton(
+                    onClick = {
                         onScheduleReminder(
                             accountId,
                             appointment.id,
@@ -379,6 +432,24 @@ fun SummaryScreen(
             dismissButton = {
                 TextButton(onClick = { medicationForReminder = null }) {
                     Text("Cancel", color = AppColors.TextSecondary)
+                }
+            },
+            containerColor = AppColors.SurfaceWhite
+        )
+    }
+    if (calendarLaunchError) {
+        AlertDialog(
+            onDismissRequest = { calendarLaunchError = false },
+            title = { Text("Calendar app not found", color = AppColors.TextPrimary) },
+            text = {
+                Text(
+                    "Could not open a calendar app on this device.",
+                    color = AppColors.TextSecondary
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { calendarLaunchError = false }) {
+                    Text("OK", color = AppColors.PrimaryBlue)
                 }
             },
             containerColor = AppColors.SurfaceWhite
