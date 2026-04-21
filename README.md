@@ -10,8 +10,9 @@ An edge AI Android app for recording and transcribing GP consultations. All proc
 - **Encrypted storage**: Auth data and appointments are encrypted (EncryptedSharedPreferences, EncryptedFile). GDPR-aligned.
 - **Multi-account**: Patient and Carer accounts. Carers can add patient accounts and switch between them (with password verification).
 - **GP consent flow**: Consent dialog before recording to address clinician concerns.
-- **Medication reminders**: Schedule reminders from the summary screen; encrypted reminder storage; `AlarmManager` with notifications; rescheduled after reboot via `BootReceiver`.
-- **Accessibility**: Date picker for DOB, contrast, typography, and labelled buttons.
+- **Medication reminders**: Schedule reminders from the summary screen; encrypted reminder storage; `AlarmManager` with notifications; rescheduled after reboot via `BootReceiver`. On Android 13+, grant **Notifications** so alerts can show; you can use **Test alert now** in the reminder dialog to verify.
+- **Follow-up calendar**: When a follow-up is extracted, use **Add follow-up to calendar** on the summary screen to open the device calendar app with a pre-filled event (title, notes, suggested time).
+- **Accessibility**: Date picker for DOB, contrast, typography, labelled buttons, and WCAG-oriented content descriptions on icons.
 - **Offline-first**: No network permission for core use. Model can be bundled in the APK or placed in Downloads.
 
 Speech-to-text is tuned for **Irish-accented English** (English-only Whisper models, `initial_prompt` for common meds/phrases in the native layer, plus **WordVariations** for ASR correction).
@@ -48,7 +49,7 @@ app/src/main/
 │   ├── model/
 │   │   ├── Appointment.kt
 │   │   ├── MedicalSchema.kt
-|   |   ├── MedicationReminder.kt
+│   │   ├── MedicationReminder.kt
 │   │   ├── UserSession.kt
 │   │   └── AppState.kt
 │   ├── reminder/
@@ -90,7 +91,7 @@ git clone https://github.com/ggerganov/whisper.cpp.git
 
 ### 2. Add a Whisper model
 
-The app resolves model in this order: **app files directory** (cache/internal copy), in preference order `ggml-small.en.bin` → `ggml-base.en.bin` → `ggml-tiny.bin` → `ggml-base.bin`; then **assets** (same names, copied into files dir); then **`/sdcard/Download/`** for `ggml-small.en.bin` or `ggml-base.en.bin` if present.
+The app resolves a model in this order: **app files directory** (cache/internal copy), in preference order `ggml-small.en.bin` → `ggml-base.en.bin` → `ggml-tiny.bin` → `ggml-base.bin`; then **assets** (same names, copied into files dir); then **`/sdcard/Download/`** for `ggml-small.en.bin` or `ggml-base.en.bin` if present.
 
 **Option A: Bundle in APK (recommended)**  
 Place a model file in `app/src/main/assets/`:
@@ -122,10 +123,10 @@ Put the model in the device’s Download folder (e.g. `/sdcard/Download/ggml-sma
 1. **Sign up / log in**: Create a Patient or Carer account (local only).
 2. **Account setup**: Enter display name, DOB, and current medications.
 3. **Model**: On first run, the app loads the model from assets or files. If missing, it shows setup instructions.
-4. **Permissions**: Grant microphone access when prompted.
+4. **Permissions**: Grant microphone when prompted. For reminders, allow **notifications** (Android 13+). If the OS offers **Alarms & reminders** / exact alarm access, allow it for more reliable daily reminder times.
 5. **Record**: Tap “Start Recording” → confirm GP consent → record → stop.
 6. **Review**: Edit the transcript if needed, then save.
-7. **Summary**: View extracted medications, tests, follow-up, and safety advice. Optionally **set medication reminders** or add items to current medications on the account.
+7. **Summary**: View extracted medications, tests, follow-up, and safety advice. Optionally **set medication reminders**, **add follow-up to calendar**, or add items to current medications on the account.
 8. **Past summaries**: Access previous appointment summaries from the home screen.
 
 Carers can add patient accounts and switch between them (password required) to record and view summaries for each person.
@@ -141,8 +142,8 @@ Carers can add patient accounts and switch between them (password required) to r
 5. **Whisper**: JNI to whisper.cpp, coroutine-based API.
 6. **Extraction**: SchemaGuidedExtractor + WordVariations (phrase normalisation, medication aliases).
 7. **Storage**: EncryptedFile for appointments, migration from legacy plain JSON.
-8. **Reminders**: ReminderScheduler / ReminderStorage (encrypted); receivers for alarm and boot.
-   
+8. **Reminders**: ReminderScheduler / ReminderStorage (encrypted); `ReminderReceiver` and `BootReceiver` registered in the manifest; optional `SCHEDULE_EXACT_ALARM` for reliable alarm times.
+
 ### Data flow
 
 ```
@@ -154,13 +155,15 @@ Audio → AudioRecorder → WAV → WhisperContext → Transcription
                                                     ↓
                                           LocalStorage (encrypted)
                                                     ↓
-                          Optional: ReminderScheduler / ReminderStorage (encrypted)
+                               Optional: ReminderScheduler / ReminderStorage (encrypted)
+                                                    ↓
+                               Optional: device calendar (follow-up insert intent)
 ```
 
 ## Privacy
 
 - **No cloud**: No network permission for core features.
-- **Encrypted storage**: Auth, appointments and scheduled reminders encrypted at rest.
+- **Encrypted storage**: Auth, appointments, and scheduled reminders encrypted at rest.
 - **Local only**: Audio and transcripts never leave the device.
 - **No analytics**: No tracking or telemetry.
 - **Backup**: Encrypted data excluded from Android backup (backup_rules.xml).
@@ -182,6 +185,12 @@ Audio → AudioRecorder → WAV → WhisperContext → Transcription
 - Use a smaller model (base or tiny).  
 - Keep recordings under ~5 minutes.  
 - Close other apps; avoid battery saver.
+
+**Reminders not showing**  
+
+- Enable notifications for the app in system settings.  
+- Check battery optimisation is not restricting the app.  
+- On Android 12+, allow alarm/reminder permission if prompted.
 
 ## License
 
